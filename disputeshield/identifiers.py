@@ -75,6 +75,14 @@ def notification_id() -> str:
     return new_id("ntf")
 
 
+def message_id() -> str:
+    return new_id("msg")
+
+
+def idempotency_record_id() -> str:
+    return new_id("idm")
+
+
 def generate_api_key(environment: str) -> tuple[str, str]:
     """Return (full_key, prefix).
 

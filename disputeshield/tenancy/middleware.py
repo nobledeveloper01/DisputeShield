@@ -18,18 +18,42 @@ from collections.abc import Callable, Iterator
 from django.db import connection
 from django.http import HttpRequest, HttpResponse
 
+from disputeshield.tenancy import context
+
 SESSION_VARIABLE = "disputeshield.tenant_id"
 
 
 class TenantContextMiddleware:
+    """Owns the lifetime of the tenant context for a request.
+
+    Both halves matter, and the second is the one that bites:
+
+      * **Set**, if the request already carries a tenant (a session, a resolved
+        subdomain). Authentication may also set it later, from the API key.
+      * **Reset, always.** A contextvar set during a request outlives it —
+        worker threads and event loops are reused, so the next request handled by
+        the same worker starts with the previous request's tenant still in scope
+        until something overwrites it. An anonymous or failed-authentication
+        request never overwrites it, and inherits the last tenant that did.
+
+    RLS is `SET LOCAL` and clears itself at commit, so a stale contextvar alone
+    yields zero rows rather than another tenant's rows. That is the third layer
+    doing its job — not a reason to leave the first one dirty.
+    """
+
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
-        tenant = getattr(request, "tenant", None)
-        if tenant is not None:
-            set_tenant_context(str(tenant.pk))
-        return self.get_response(request)
+        token = context.set_none()
+        try:
+            tenant = getattr(request, "tenant", None)
+            if tenant is not None:
+                context.set(str(tenant.pk))
+                set_tenant_context(str(tenant.pk))
+            return self.get_response(request)
+        finally:
+            context.reset(token)
 
 
 def set_tenant_context(tenant_id: str) -> None:

@@ -51,7 +51,21 @@ MIDDLEWARE = [
     # Establishes the RLS tenant context with SET LOCAL, inside the request's
     # transaction. Must run after authentication and before anything queries.
     "disputeshield.tenancy.middleware.TenantContextMiddleware",
+    "disputeshield.api.middleware.ActingAgentMiddleware",
 ]
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "disputeshield.api.authentication.APIKeyAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    # D8: cross-boundary access answers 404, never 403. A handler rather than a
+    # convention, because a convention is something one view eventually forgets.
+    "EXCEPTION_HANDLER": "disputeshield.api.exceptions.exception_handler",
+    "DEFAULT_PAGINATION_CLASS": "disputeshield.api.pagination.DisputeCursorPagination",
+    "PAGE_SIZE": 50,
+    "UNAUTHENTICATED_USER": None,
+}
 
 ROOT_URLCONF = "server.urls"
 WSGI_APPLICATION = "server.wsgi.application"

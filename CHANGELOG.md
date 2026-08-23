@@ -9,6 +9,77 @@ and released from one tag.
 
 ## [Unreleased]
 
+### Added — phase 3, the management API and the case lifecycle
+
+- `Dispute` and `DisputeMessage`. Messages are immutable with no edit path — a
+  correction is a new message, for the same reason the audit trail appends: a
+  conversation that can be edited afterwards is not evidence of what was said.
+- §3.4's state machine as a **table** (`disputeshield/disputes/states.py`), so the
+  tests enumerate it. A transition added in a later phase is automatically covered
+  by the assertion that every transition records actor, reason and the SLA clock
+  state at that instant, rather than only if somebody wrote a test beside it.
+- `disputeshield.disputes.service` — the only supported way to write a case. The
+  API calls it, the admin will call it (D10), commands call it. That is what lets
+  the audit trail be complete without qualification.
+- Management API (§7.3): cursor-paginated queue sorted by urgency with breached
+  cases pinned, filters by status/category/assignee/amount/risk, and actions for
+  transition, pause, resume, resolve, assign, messages and SLA.
+- Two unrelated serializer families. Widget and management share **no base class**
+  — inheritance is how a field added for agents silently appears in a customer's
+  response.
+- API key authentication (Argon2id), the §6.5 role model, and an acting-agent
+  header so the audit trail names the person rather than the key.
+- D8's 404-not-403 exception handler, project-wide rather than per-view.
+- Idempotency on every write, stored rather than cached, with a request
+  fingerprint so reusing a key with a different body is a 409 instead of silently
+  returning the first response and hiding a client bug.
+
+### Fixed — during phase 3
+
+- **The role permission classes did not require authentication.** Setting
+  `permission_classes` on a view *replaces* `IsAuthenticated` rather than adding
+  to it, so an anonymous request passed the permission check and reached the
+  queryset. Nothing leaked — the scoped manager raised — but the last layer was
+  doing the first layer's job, and the caller got a 500 instead of a 401.
+- **The tenant contextvar outlived its request.** Authentication set it and
+  nothing reset it; worker threads are reused, so the next request began with the
+  previous request's tenant in scope, and an anonymous request never overwrote it.
+  `TenantContextMiddleware` now owns the lifetime and resets in a `finally`.
+  Found by test-ordering pollution — which is exactly how it would have been found
+  in production.
+- **RLS on the API key table made authentication impossible.** The lookup happens
+  before a tenant context exists, so the blanket policy from migration 0003
+  returned zero rows and every request answered 401. The model docstring already
+  said the lookup could not be tenant-scoped; the migration contradicted it. The
+  policy is now split by command: SELECT unscoped (the row holds a prefix and an
+  Argon2id hash), writes still tenant-scoped.
+- **The queue performance gate was measuring one row.** The load fixture reused
+  the seed case's clock, which is a OneToOne, so every bulk insert violated the
+  constraint and `ignore_conflicts=True` swallowed all 9,999 of them. The fixture
+  now builds a clock per case and asserts the row count before measuring — a
+  performance gate that silently measures nothing is worse than no gate, because
+  it reports success.
+
+### Tests — 172 passing, 91% coverage
+
+- `test_serializer_leakage.py` — walks the widget serializers' **full field
+  graph**, checks `source` aliases, asserts the widget and management serializers
+  share no base class, and enumerates the module so a new widget serializer added
+  without coverage fails the build.
+- `test_no_mutation_routes.py` — walks the **resolved URLconf** asserting no route
+  binds PUT/PATCH/DELETE and no `ModelViewSet` exists, then greps the API package
+  for direct ORM writes to auditable models.
+- `test_dispute_transitions.py` — drives every entry in the transition table.
+- `test_management_api.py` — authentication (including that an unknown prefix and
+  a wrong secret are byte-identical responses), the queue's urgency ordering and
+  breach pinning, cursor pagination, idempotent replay, 409 on key reuse, and
+  role separation.
+- `test_queue_performance.py` — p95 under 300 ms at 10,000 open cases, plus a
+  query-plan assertion so the budget is not met by a sequential scan that stops
+  being fast at the next order of magnitude.
+- Cross-tenant and cross-customer isolation extended to the HTTP layer: 404, never
+  403, on both reads and writes.
+
 ### Added — phase 2, the SLA engine
 
 - `compute_deadline` and `business_time_between` (`disputeshield/sla/deadlines.py`)

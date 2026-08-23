@@ -132,8 +132,16 @@ jobs:
       - name: the sweep is idempotent and catch-up replays exactly what was missed
         run: pytest tests/test_sla_sweep.py -q
 
+      - name: serializer field graph (§10) — no path from a customer to internal content
+        run: pytest -m leakage -q
+
+      - name: every state transition writes actor, reason and clock state (§3.4)
+        run: pytest tests/test_dispute_transitions.py -q
+
+      - name: the queue stays under 300ms p95 at 10,000 open cases (§11.9)
+        run: pytest tests/test_queue_performance.py -q
+
       # Added in the phase that makes each one real:
-      #   phase 3 — serializer field-graph leakage; no route mutates an auditable record
       #   phase 4 — widget isolation in both directions
       #   phase 9 — no call path from any module to a payment write
 

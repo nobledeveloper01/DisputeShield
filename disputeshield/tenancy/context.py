@@ -44,6 +44,16 @@ def set(tenant_id: str):
     return _current_tenant.set(tenant_id)
 
 
+def set_none():
+    """Start a request with no tenant, returning a token that restores the prior value.
+
+    Used by the middleware to give every request a clean slate: a contextvar set
+    during one request outlives it, and a request that never authenticates would
+    otherwise inherit whatever tenant the previous one established.
+    """
+    return _current_tenant.set(None)
+
+
 def reset(token) -> None:
     _current_tenant.reset(token)
 

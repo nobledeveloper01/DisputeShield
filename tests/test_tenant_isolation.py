@@ -202,3 +202,78 @@ def test_all_tenants_escapes_layer_2_but_not_layer_3(tenant_a, tenant_b, as_tena
         assert AuditRecord.objects.all_tenants().count() == 1
     with as_tenant(tenant_b):
         assert AuditRecord.objects.all_tenants().count() == 1
+
+
+# -- the context must not outlive the request ----------------------------------
+
+
+def test_the_tenant_context_does_not_leak_between_requests(tenant_a, tenant_b, client_for):
+    """A contextvar set during a request outlives it.
+
+    Worker threads and event loops are reused, so without an explicit reset the
+    next request handled by the same worker starts with the previous request's
+    tenant still in scope — and a request that never authenticates never
+    overwrites it. This was found by test-ordering pollution rather than by
+    review, which is exactly how it would have been found in production.
+    """
+    from rest_framework.test import APIClient
+
+    assert context.get() is None
+    client_for(tenant_a).get("/v1/disputes/")
+    assert context.get() is None, "the authenticated request left its tenant in scope"
+
+    # An anonymous request must not inherit the previous tenant.
+    APIClient().get("/v1/disputes/")
+    assert context.get() is None
+
+
+def test_one_tenants_key_cannot_read_another_tenants_case(
+    tenant_a, tenant_b, make_dispute, client_for
+):
+    """The full-stack version of the layer-1 guarantee: 404, never 403."""
+    theirs = make_dispute(tenant_a, customer_ref="usr_a")
+
+    response = client_for(tenant_b).get(f"/v1/disputes/{theirs.pk}/")
+    assert response.status_code == 404, "a 403 here would confirm the case exists"
+    assert response.json()["error"]["type"] == "not_found"
+
+
+def test_a_cross_tenant_write_is_also_404(tenant_a, tenant_b, make_dispute, client_for):
+    import uuid
+
+    theirs = make_dispute(tenant_a, customer_ref="usr_a")
+    response = client_for(tenant_b).post(
+        f"/v1/disputes/{theirs.pk}/transition/",
+        {"to": "acknowledged"},
+        format="json",
+        HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+    )
+    assert response.status_code == 404
+
+
+def test_disputes_are_scoped_to_one_customer_within_a_tenant(tenant_a, make_dispute, as_tenant):
+    """§10's first threat: customer A reading customer B's disputes.
+
+    Asserted here at the query layer, which is where the guarantee lives. The
+    session-token half — that a token scoped to one `customer_ref` returns 404 for
+    another customer's case — lands in phase 4 with the tokens themselves.
+    """
+    from disputeshield.models import Dispute
+    from disputeshield.models.dispute import hash_customer_ref
+
+    mine = make_dispute(tenant_a, customer_ref="usr_okafor")
+    make_dispute(tenant_a, customer_ref="usr_adeyemi")
+
+    with as_tenant(tenant_a):
+        visible = Dispute.objects.filter(
+            customer_ref_hash=hash_customer_ref(tenant_a, "usr_okafor")
+        )
+        assert [d.pk for d in visible] == [mine.pk]
+
+
+def test_the_customer_ref_hash_is_salted_per_tenant(tenant_a, tenant_b):
+    """A shared salt would let one tenant's leaked table enumerate another's."""
+    from disputeshield.models.dispute import hash_customer_ref
+
+    assert hash_customer_ref(tenant_a, "usr_9931") != hash_customer_ref(tenant_b, "usr_9931")
+    assert hash_customer_ref(tenant_a, "usr_9931") == hash_customer_ref(tenant_a, "usr_9931")

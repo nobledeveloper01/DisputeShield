@@ -76,6 +76,8 @@ ignore = ["S101"]
 # without making anything safer.
 "*/migrations/*" = ["RUF012"]
 "disputeshield/models/*" = ["RUF012"]
+# DRF views declare `permission_classes` and friends as plain lists by convention.
+"disputeshield/api/*" = ["RUF012"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "server.settings"

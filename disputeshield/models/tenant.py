@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import secrets
 import zlib
 
 from django.db import models
 
 from disputeshield.identifiers import tenant_id
+
+
+def new_customer_ref_salt() -> str:
+    return secrets.token_urlsafe(32)
 
 
 class Tenant(models.Model):
@@ -21,6 +26,13 @@ class Tenant(models.Model):
     name = models.CharField(max_length=128)
     slug = models.SlugField(max_length=64, unique=True)
     is_active = models.BooleanField(default=True)
+
+    # §8.4. Per tenant, not shared: a shared salt would let one tenant's leaked
+    # table be used to enumerate another's, and a bare digest of a short
+    # identifier space (`usr_9931`) is reversed by enumeration in seconds.
+    customer_ref_salt = models.CharField(
+        max_length=64, default=new_customer_ref_salt, editable=False
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

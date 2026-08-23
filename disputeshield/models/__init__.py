@@ -9,6 +9,14 @@ from disputeshield.models.clock import (
     SLAEvent,
     SweepHeartbeat,
 )
+from disputeshield.models.dispute import (
+    Dispute,
+    DisputeMessage,
+    IdempotencyRecord,
+    Outcome,
+    Status,
+    hash_customer_ref,
+)
 from disputeshield.models.policy import SLAPolicy, SLAPolicyVersion
 from disputeshield.models.tenant import Tenant
 
@@ -18,13 +26,19 @@ __all__ = [
     "AuditRecord",
     "BusinessCalendar",
     "BusinessHoursWindow",
+    "Dispute",
+    "DisputeMessage",
     "Holiday",
+    "IdempotencyRecord",
     "NotificationOutbox",
+    "Outcome",
     "SLAClock",
     "SLADeadline",
     "SLAEvent",
     "SLAPolicy",
     "SLAPolicyVersion",
+    "Status",
     "SweepHeartbeat",
     "Tenant",
+    "hash_customer_ref",
 ]

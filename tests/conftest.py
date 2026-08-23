@@ -188,12 +188,15 @@ def make_calendar(as_tenant):
 
     def _make(tenant, *, timezone_name="Africa/Lagos", always_open=False, holidays=()):
         with as_tenant(tenant):
-            calendar = BusinessCalendar.objects.create(
+            # get_or_create so a test can file several cases without colliding on
+            # the calendar's unique name — a tenant has one calendar, not one per case.
+            calendar, fresh = BusinessCalendar.objects.get_or_create(
                 tenant=tenant,
                 name=f"{timezone_name} standard",
-                timezone_name=timezone_name,
-                always_open=always_open,
+                defaults={"timezone_name": timezone_name, "always_open": always_open},
             )
+            if not fresh:
+                return calendar
             if not always_open:
                 for weekday in range(5):
                     BusinessHoursWindow.objects.create(
@@ -225,7 +228,10 @@ def make_policy(as_tenant, make_calendar):
     ):
         calendar = calendar or make_calendar(tenant)
         with as_tenant(tenant):
-            policy = SLAPolicy.objects.create(tenant=tenant, category=category)
+            policy, _ = SLAPolicy.objects.get_or_create(tenant=tenant, category=category)
+            existing = policy.versions.order_by("-version").first()
+            if existing is not None:
+                return existing
             return SLAPolicyVersion.objects.create(
                 tenant=tenant,
                 policy=policy,
@@ -237,5 +243,68 @@ def make_policy(as_tenant, make_calendar):
                 warning_thresholds=list(warning_thresholds),
                 regulatory_reference="CBN Consumer Protection Framework s.4.2",
             )
+
+    return _make
+
+
+@pytest.fixture
+def make_dispute(as_tenant, make_policy):
+    """File a case the way the API does — through the service, never the ORM."""
+
+    def _make(tenant, *, policy_version=None, customer_ref="usr_9931", **kwargs):
+        from disputeshield.disputes import service
+
+        policy_version = policy_version or make_policy(tenant)
+        with as_tenant(tenant):
+            return service.file_dispute(
+                tenant=tenant,
+                customer_ref=customer_ref,
+                category=kwargs.pop("category", "failed_transfer"),
+                description=kwargs.pop("description", "Transfer failed but I was debited"),
+                policy_version=policy_version,
+                actor_type="api_key",
+                actor_id=kwargs.pop("actor_id", "key_test"),
+                **kwargs,
+            )
+
+    return _make
+
+
+@pytest.fixture
+def api_key_for(as_tenant):
+    """A usable API key, hashed the way the product hashes them."""
+
+    def _make(tenant, environment="live"):
+        from disputeshield.api.authentication import hash_key
+        from disputeshield.identifiers import generate_api_key
+
+        full, prefix = generate_api_key(environment)
+        with as_tenant(tenant):
+            key = APIKey.objects.create(
+                tenant=tenant,
+                name="test key",
+                environment=environment,
+                prefix=prefix,
+                key_hash=hash_key(full),
+            )
+        return full, key
+
+    return _make
+
+
+@pytest.fixture
+def client_for(api_key_for):
+    """An APIClient authenticated as a tenant, optionally acting for an agent."""
+
+    def _make(tenant, agent=None):
+        from rest_framework.test import APIClient
+
+        full, _ = api_key_for(tenant)
+        client = APIClient()
+        headers = {"HTTP_AUTHORIZATION": f"Bearer {full}"}
+        if agent is not None:
+            headers["HTTP_X_DISPUTESHIELD_ACTING_AGENT"] = agent.pk
+        client.credentials(**headers)
+        return client
 
     return _make

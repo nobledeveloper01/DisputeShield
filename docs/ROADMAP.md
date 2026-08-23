@@ -164,10 +164,18 @@ patched, because the interesting output of this phase is the bugs the property t
 - No `PATCH` or `DELETE` route resolves to any auditable record. Asserted by walking the resolved
   URLconf, not by convention
 - Isolation suite extended to customer level: customer A's session token returns 404 for customer B's
-  dispute
+  dispute. *The query-layer half is asserted in phase 3; the session-token half lands in phase 4 with
+  the tokens themselves.*
 - Queue p95 under 300 ms with 10,000 open disputes
 
 **Review:** `/review`, then `/plan-design-review` on the queue and case view before they are built out.
+
+> **Sequencing note.** Phase 3 delivers the workspace's data layer — the urgency
+> ordering, the breach pinning, the filters and the case view's payload, all under
+> the p95 gate. The React workspace itself moves to phase 4, which is where the
+> frontend toolchain, the Playwright harness and the accessibility gates land. The
+> alternative is standing that toolchain up twice, and the queue's behaviour is
+> asserted here either way.
 
 ---
 
