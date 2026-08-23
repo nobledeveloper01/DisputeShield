@@ -157,5 +157,5 @@ class TestProductionInvariants:
             conf.get("ENCYRPTION_KEY_REF")
 
     def test_documented_defaults_are_readable(self):
-        assert conf.get("SESSION_TOKEN_TTL_SECONDS") == 1800
+        assert conf.get("SESSION_LIFETIME_SECONDS") == 1800
         assert conf.get("DEFAULT_SLA_POLICY")["resolution_hours"] == 72

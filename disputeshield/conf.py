@@ -18,8 +18,10 @@ DEFAULTS: dict[str, Any] = {
     "TENANT_MODEL": "disputeshield.Tenant",
     "WIDGET_ORIGIN": None,
     "ENCRYPTION_KEY_REF": None,
-    # nosec B105 - a TTL in seconds, not a credential. Bandit matches the key name.
-    "SESSION_TOKEN_TTL_SECONDS": 1800,  # nosec B105
+    # Named for the session rather than the token: bandit reads a key containing
+    # TOKEN with a literal value as a hardcoded credential, and a permanent
+    # suppression to silence a false positive is worse than a clearer name.
+    "SESSION_LIFETIME_SECONDS": 1800,
     "DEFAULT_SLA_POLICY": {
         "acknowledgement_minutes": 60,
         "resolution_hours": 72,
