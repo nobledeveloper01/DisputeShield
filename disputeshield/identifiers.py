@@ -43,6 +43,38 @@ def dispute_id() -> str:
     return new_id("dsp")
 
 
+# Named rather than lambdas: Django serialises a field's `default` into the
+# migration file, and a lambda cannot be serialised. Discovering that during
+# `makemigrations` is cheap; discovering it after a model is in production and
+# the migration graph has moved on is not.
+def calendar_id() -> str:
+    return new_id("cal")
+
+
+def policy_id() -> str:
+    return new_id("pol")
+
+
+def policy_version_id() -> str:
+    return new_id("plv")
+
+
+def clock_id() -> str:
+    return new_id("clk")
+
+
+def sla_event_id() -> str:
+    return new_id("sev")
+
+
+def deadline_id() -> str:
+    return new_id("dln")
+
+
+def notification_id() -> str:
+    return new_id("ntf")
+
+
 def generate_api_key(environment: str) -> tuple[str, str]:
     """Return (full_key, prefix).
 

@@ -4,7 +4,16 @@ import pytest
 from django.db import connection
 
 from disputeshield.identifiers import generate_api_key
-from disputeshield.models import Agent, APIKey, Tenant
+from disputeshield.models import (
+    Agent,
+    APIKey,
+    BusinessCalendar,
+    BusinessHoursWindow,
+    Holiday,
+    SLAPolicy,
+    SLAPolicyVersion,
+    Tenant,
+)
 from disputeshield.tenancy import context
 from disputeshield.tenancy.middleware import db_tenant_context
 
@@ -170,3 +179,63 @@ def tamper(raw_sql):
             raw_sql("REVOKE UPDATE, DELETE ON disputeshield_auditrecord FROM CURRENT_USER")
 
     return _tamper
+
+
+@pytest.fixture
+def make_calendar(as_tenant):
+    """A Monday-to-Friday 09:00-17:00 calendar in the tenant's timezone."""
+    from datetime import time
+
+    def _make(tenant, *, timezone_name="Africa/Lagos", always_open=False, holidays=()):
+        with as_tenant(tenant):
+            calendar = BusinessCalendar.objects.create(
+                tenant=tenant,
+                name=f"{timezone_name} standard",
+                timezone_name=timezone_name,
+                always_open=always_open,
+            )
+            if not always_open:
+                for weekday in range(5):
+                    BusinessHoursWindow.objects.create(
+                        calendar=calendar,
+                        weekday=weekday,
+                        opens_at=time(9, 0),
+                        closes_at=time(17, 0),
+                    )
+            for observed_on in holidays:
+                Holiday.objects.create(
+                    calendar=calendar, observed_on=observed_on, name="Public holiday"
+                )
+            return calendar
+
+    return _make
+
+
+@pytest.fixture
+def make_policy(as_tenant, make_calendar):
+    def _make(
+        tenant,
+        *,
+        category="failed_transfer",
+        calendar=None,
+        acknowledgement_minutes=60,
+        resolution_hours=8,
+        business_hours_only=True,
+        warning_thresholds=(50, 80, 95),
+    ):
+        calendar = calendar or make_calendar(tenant)
+        with as_tenant(tenant):
+            policy = SLAPolicy.objects.create(tenant=tenant, category=category)
+            return SLAPolicyVersion.objects.create(
+                tenant=tenant,
+                policy=policy,
+                version=1,
+                calendar=calendar,
+                acknowledgement_minutes=acknowledgement_minutes,
+                resolution_hours=resolution_hours,
+                business_hours_only=business_hours_only,
+                warning_thresholds=list(warning_thresholds),
+                regulatory_reference="CBN Consumer Protection Framework s.4.2",
+            )
+
+    return _make

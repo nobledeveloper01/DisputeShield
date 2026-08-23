@@ -45,6 +45,7 @@ class Command(BaseCommand):
             self._check_audit_grants(),
             self._check_row_level_security(),
             self._check_clock_skew(),
+            self._check_sweep_heartbeat(),
         ]
 
         for check in checks:
@@ -116,6 +117,36 @@ class Command(BaseCommand):
                 "BYPASSRLS) — the third isolation layer is inert",
             )
         return Check("row level security", True, "connecting role is subject to RLS")
+
+    def _check_sweep_heartbeat(self) -> Check:
+        """§11.3/§11.5: the compliance clock only advances if the sweep runs.
+
+        A never-started beat is the dangerous case, not the reassuring one: the
+        API is up, the dashboard renders, and every clock is frozen. This check is
+        a warning rather than fatal because a fresh installation has legitimately
+        never swept — but it says so in those words, so nobody reads a blank as
+        healthy.
+        """
+        from disputeshield.sla.sweeper import heartbeat_age_seconds
+
+        age = heartbeat_age_seconds()
+        if age is None:
+            return Check(
+                "sla sweep heartbeat",
+                False,
+                "the sweep has never run — SLA clocks are not advancing. Start Celery "
+                "beat (exactly one replica, holding a leader lock).",
+                fatal=False,
+            )
+        if age > 180:
+            return Check(
+                "sla sweep heartbeat",
+                False,
+                f"last swept {age:.0f}s ago, past the 3-minute budget — see "
+                "docs/runbook-sla-sweep.md",
+                fatal=False,
+            )
+        return Check("sla sweep heartbeat", True, f"last swept {age:.0f}s ago")
 
     def _check_clock_skew(self) -> Check:
         """Every deadline in the product is computed against a clock. It should be the same one."""

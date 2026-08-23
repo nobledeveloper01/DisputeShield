@@ -33,9 +33,41 @@ def without_the_immutability_trigger(raw_sql):
 
 
 def test_the_doctor_passes_on_a_correctly_migrated_database():
+    """A healthy installation has a sweep that has run, so the fixture runs one.
+
+    The heartbeat check is non-fatal — a fresh install has legitimately never
+    swept — but it still reports FAIL, because a blank must not read as healthy.
+    """
+    from disputeshield.sla import sweeper
+
+    sweeper.sweep()
+
     out = io.StringIO()
     call_command("disputeshield_doctor", "--strict", stdout=out)
     assert "FAIL" not in out.getvalue()
+
+
+def test_a_stalled_sweep_is_reported_but_does_not_refuse_to_serve():
+    """§11.5's failure mode, surfaced at install time.
+
+    Non-fatal on purpose: refusing to start because the heartbeat is stale would
+    take down the API in response to a scheduler problem, turning a silent
+    compliance outage into a loud availability one — and losing the ability to
+    read the dashboard that shows which cases are affected.
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from disputeshield.models import SweepHeartbeat
+
+    SweepHeartbeat.objects.update_or_create(
+        singleton=True, defaults={"last_swept_at": timezone.now() - timedelta(hours=1)}
+    )
+
+    out = io.StringIO()
+    call_command("disputeshield_doctor", "--strict", stdout=out)  # does not raise
+    assert "past the 3-minute budget" in out.getvalue()
 
 
 def test_the_doctor_fails_when_the_trigger_is_missing(without_the_immutability_trigger):

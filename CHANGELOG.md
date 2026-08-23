@@ -9,6 +9,70 @@ and released from one tag.
 
 ## [Unreleased]
 
+### Added — phase 2, the SLA engine
+
+- `compute_deadline` and `business_time_between` (`disputeshield/sla/deadlines.py`)
+  — pure, Django-free, and written as each other's check rather than sharing an
+  implementation, so their agreement is evidence instead of tautology.
+- `BusinessCalendar` as a plain value object: weekday windows, local-date
+  holidays, continuous (24/7) mode, and a search horizon that raises
+  `ImpossibleCalendar` rather than looping forever on a calendar that is never
+  open — a hung sweep is a stopped compliance clock for every tenant on the worker.
+- `elapsed_fraction` — warning thresholds are percentages of *business* time. A
+  case filed Friday afternoon is not 60% consumed by Sunday.
+- Models: `BusinessCalendar`, `BusinessHoursWindow`, `Holiday`, `SLAPolicy`,
+  `SLAPolicyVersion` (immutable, ADR-0004), `SLAClock`, `SLAEvent`, `SLADeadline`,
+  `NotificationOutbox`, `SweepHeartbeat`. RLS enabled and **FORCEd** on all of them.
+- Clock lifecycle: `start`, `pause`, `resume`, `stop`. Pause and resume require a
+  reason at the service layer **and** at the database layer — a `CheckConstraint`
+  makes a reasonless pause event unrepresentable, because a reason enforced only
+  in a service is one refactor from optional.
+- Every clock event records `clock_remaining_seconds` at the moment it happened.
+  That field is what makes a breach explainable six months later.
+- The watermark-driven sweep (ADR-0007): claims due deadlines with `SKIP LOCKED`,
+  writes the outbox row in the same transaction that marks the deadline fired,
+  under an idempotency key derived from *what* the notification is about rather
+  than *when* it was generated. That is what makes §11.5's catch-up step safe to
+  run during an incident instead of causing a second one.
+- `SweepHeartbeat`, written even on a quiet sweep — "nothing was due" and "the
+  scheduler is dead" look identical from outside, and only one is an incident.
+- `disputeshield_sweep` management command with `--catch-up`, `--to` and
+  `--dry-run`, so §11.5 step 4 is an executed procedure rather than prose.
+- Nightly reconciliation of materialised deadlines against the pure function.
+  Divergence is **reported, never repaired** — a mismatch may be a bug or an owed
+  backfill, and rewriting the row destroys the evidence needed to tell which.
+- `disputeshield_doctor` gained a heartbeat check. Non-fatal by design: refusing
+  to serve because the scheduler stalled would turn a silent compliance outage
+  into a loud availability one, and take down the dashboard showing which cases
+  are affected.
+
+### Fixed — during phase 2
+
+- **An open pause interval was measured to `now()` rather than to the instant
+  being evaluated.** A clock evaluated at the moment it was paused counted its own
+  pause as already elapsed and reported zero time remaining — wrong, and exactly
+  backwards. `paused_intervals_of` now takes the instant under evaluation.
+- **`disputeshield.sla.sweep` was both a module and an exported function**, so the
+  package export shadowed the module and `from disputeshield.sla import sweep`
+  yielded whichever was imported last. The module is now `sweeper`.
+
+### Tests — 121 passing, 93% coverage
+
+- `test_sla_deadlines.py` — the matrix: weekends, holidays as *local* dates, DST
+  in both directions, windows starting before opening and after closing, windows
+  shorter than a business day, multiple pauses, a pause spanning a holiday and one
+  spanning a weekend, overlapping pauses merged rather than double-subtracted.
+  Runs a second time under `TZ=Pacific/Kiritimati`.
+- Two Hypothesis properties, run at **10,000 examples** in CI with no falsifying
+  case: the round trip (a computed deadline contains exactly the business time
+  requested) and monotonicity (a longer window never yields an earlier deadline).
+- `test_sla_clock.py` — pause discipline asserted four ways, including by
+  introspecting the service signature so a future overload with a defaulted
+  `reason` fails the build.
+- `test_sla_sweep.py` — firing, idempotency, catch-up, late-detection recording,
+  the heartbeat's 3-minute alert budget, reconciliation, and the runbook's shell
+  command run twice to prove it pages nobody twice.
+
 ### Added — phase 1, tenancy and the immutable audit trail
 
 - `Tenant`, `Agent`, `APIKey` and `AuditRecord`, with `on_delete=PROTECT`

@@ -116,8 +116,23 @@ jobs:
       - name: the doctor fails when the immutability trigger is absent
         run: pytest tests/test_doctor_detects_missing_trigger.py -q
 
+      - name: deadline correctness (§4.4) — DST both ways, holidays, pauses
+        run: pytest tests/test_sla_deadlines.py -q
+        env:
+          HYPOTHESIS_EXAMPLES: "10000"
+
+      - name: deadline correctness under a hostile local timezone
+        # A deadline that depends on where the server runs is a deadline that
+        # changes when the deployment moves regions.
+        run: TZ=Pacific/Kiritimati pytest tests/test_sla_deadlines.py -q
+
+      - name: the clock cannot be paused without a reason (§4.4 C3)
+        run: pytest tests/test_sla_clock.py -q
+
+      - name: the sweep is idempotent and catch-up replays exactly what was missed
+        run: pytest tests/test_sla_sweep.py -q
+
       # Added in the phase that makes each one real:
-      #   phase 2 — deadline correctness, incl. a second run under TZ=Pacific/Kiritimati
       #   phase 3 — serializer field-graph leakage; no route mutates an auditable record
       #   phase 4 — widget isolation in both directions
       #   phase 9 — no call path from any module to a payment write
