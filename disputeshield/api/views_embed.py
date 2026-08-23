@@ -157,12 +157,14 @@ def _api_origin(request) -> str:
     if configured:
         return configured
     if settings.DEBUG:
-        # nosemgrep: python.flask.security.audit.directly-returned-format-string
-        # The rule looks for a Flask view returning a formatted response body.
-        # This is a Django helper returning an origin for a CSP directive, on a
-        # branch that cannot execute in production, from a host Django has
-        # already validated against ALLOWED_HOSTS.
-        return f"{request.scheme}://{request.get_host()}"
+        # The rule below looks for a Flask view returning a formatted response
+        # body. This is a Django helper returning an origin for a CSP directive,
+        # on a branch that cannot execute in production, from a host Django has
+        # already validated against ALLOWED_HOSTS. The suppression has to sit on
+        # the line itself — semgrep only reads the offending line and the one
+        # immediately above it.
+        scheme, host = request.scheme, request.get_host()
+        return f"{scheme}://{host}"  # nosemgrep: python.flask.security.audit.directly-returned-format-string
     # No configured origin in production means the widget calls nowhere, which
     # fails closed rather than guessing.
     return "'none'"

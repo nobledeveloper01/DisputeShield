@@ -78,6 +78,9 @@ ignore = ["S101"]
 "disputeshield/models/*" = ["RUF012"]
 # DRF views declare `permission_classes` and friends as plain lists by convention.
 "disputeshield/api/*" = ["RUF012"]
+# A semgrep suppression pragma has to live on the offending line, so that one
+# line is allowed to run long.
+"disputeshield/api/views_embed.py" = ["RUF012", "E501"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "server.settings"
