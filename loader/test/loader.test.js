@@ -4,7 +4,10 @@ import test from 'node:test';
 
 import { loadLoader, makeWindow } from './dom-stub.js';
 
-const KEY = 'pk_live_abc123';
+// A `test` key, not a `live`-shaped one. The repository's own gitleaks rule
+// fails the build on `pk_live_`/`ds_live_` anywhere, including in a fixture —
+// which is how a real key eventually gets pasted into one.
+const KEY = 'pk_test_loader_fixture';
 const BASE = 'https://widget.disputeshield.dev';
 
 function mount(overrides = {}) {
@@ -28,7 +31,7 @@ test('creates exactly one sandboxed cross-origin iframe', () => {
 
 test('the iframe src carries the publishable key and nothing secret', () => {
   const { api } = mount();
-  assert.match(api.frame.src, /\/v1\/embed\?k=pk_live_abc123/);
+  assert.match(api.frame.src, /\/v1\/embed\?k=pk_test_loader_fixture/);
   assert.ok(!/dst_/.test(api.frame.src), 'a session token must never reach the URL');
 });
 

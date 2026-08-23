@@ -1,0 +1,44 @@
+# Gitleaks configuration.
+#
+# The default rules stay on in full. This file adds one narrow allowlist, and
+# the narrowness is the point: a broad `paths` exclusion is how a real key later
+# lands in an ignored directory and nobody hears about it.
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "disputeshield-live-key"
+description = "A DisputeShield live API key must never appear in the repository"
+regex = '''(ds|pk)_live_[A-Za-z0-9_\-]{20,}'''
+keywords = ["ds_live_", "pk_live_"]
+
+[allowlist]
+description = """
+The end-to-end browser fixture uses two fixed `test` environment keys so the
+hostile host page can be a static file rather than templated at run time.
+
+They are safe to publish, and the safety is enforced rather than asserted:
+
+  * both are `test` keys, and §8.2 scopes keys per environment — a leaked test
+    key can do nothing to live data;
+  * `disputeshield_seed_e2e` refuses to seed anything that is not a test key;
+  * the rule above fails the build on a `live` key regardless of this allowlist.
+"""
+regexes = [
+  '''(ds|pk)_test_e2e_0{20,}''',
+]
+commits = [
+  # A loader unit-test fixture briefly used a `pk_live_`-shaped fake key. It was
+  # never a real credential and the fixture now uses a `test` key — but the value
+  # is in published history, and rewriting published history to erase a string
+  # that was never a secret costs every clone a force-push for no security gain.
+  # Allowlisted by exact commit so the rule keeps firing everywhere else.
+  "e09cf80cab12f2c40cc4cdd513a2c26c23f48647",
+]
+paths = [
+  '''disputeshield/management/commands/disputeshield_seed_e2e\.py''',
+  '''widget/tests/fixtures/host\.html''',
+  '''widget/tests/serve-host\.mjs''',
+  '''\.gitleaks\.toml''',
+]
