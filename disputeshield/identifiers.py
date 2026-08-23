@@ -83,15 +83,21 @@ def idempotency_record_id() -> str:
     return new_id("idm")
 
 
-def generate_api_key(environment: str) -> tuple[str, str]:
+def generate_api_key(environment: str, kind: str = "secret") -> tuple[str, str]:
     """Return (full_key, prefix).
 
-    Format is `ds_{env}_{random32}` per §8.2. The prefix is stored in plaintext
-    so a key can be looked up and displayed in the dashboard; the remainder is
-    Argon2id-hashed and never retrievable.
+    Secret keys are `ds_{env}_{random32}` per §8.2; publishable keys are
+    `pk_{env}_{random32}`. The two prefixes are visually distinct on purpose — a
+    secret key pasted into a public page is the mistake this naming exists to make
+    obvious at a glance, in a code review and in a leaked-secret scan.
+
+    The prefix is stored in plaintext so a key can be looked up and displayed in
+    the dashboard; the remainder is Argon2id-hashed and never retrievable.
     """
     if environment not in {"test", "live"}:
         raise ValueError(f"environment must be 'test' or 'live', got {environment!r}")
-    secret = secrets.token_urlsafe(32)
-    full = f"ds_{environment}_{secret}"
+    if kind not in {"secret", "publishable"}:
+        raise ValueError(f"kind must be 'secret' or 'publishable', got {kind!r}")
+    body = secrets.token_urlsafe(32)
+    full = f"pk_{environment}_{body}" if kind == "publishable" else f"ds_{environment}_{body}"
     return full, full[:16]

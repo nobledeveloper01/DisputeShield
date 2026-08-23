@@ -308,3 +308,97 @@ def client_for(api_key_for):
         return client
 
     return _make
+
+
+@pytest.fixture
+def publishable_key_for(as_tenant):
+    def _make(tenant, environment="live"):
+        from disputeshield.api.authentication import hash_key
+        from disputeshield.identifiers import generate_api_key
+
+        full, prefix = generate_api_key(environment, kind="publishable")
+        with as_tenant(tenant):
+            key = APIKey.objects.create(
+                tenant=tenant,
+                name="widget key",
+                environment=environment,
+                kind=APIKey.Kind.PUBLISHABLE,
+                prefix=prefix,
+                key_hash=hash_key(full),
+            )
+        return full, key
+
+    return _make
+
+
+@pytest.fixture
+def allowed_origin(as_tenant):
+    def _make(tenant, origin="https://app.acme.io"):
+        from disputeshield.models import AllowedOrigin
+
+        with as_tenant(tenant):
+            return AllowedOrigin.objects.create(tenant=tenant, origin=origin)
+
+    return _make
+
+
+@pytest.fixture
+def session_for(api_key_for, as_tenant, make_policy):
+    """Mint a real session the way a fintech's backend does."""
+
+    def _make(tenant, customer_ref="usr_9931", transactions=None):
+        from disputeshield.api import sessions
+
+        make_policy(tenant)  # a category must exist before a case can be filed
+        _, key = api_key_for(tenant)
+        with as_tenant(tenant):
+            token, session = sessions.mint(
+                tenant=tenant,
+                customer_ref=customer_ref,
+                api_key_id=key.pk,
+                display_name="A. Okafor",
+                transactions=transactions
+                if transactions is not None
+                else [
+                    {
+                        "reference": "TXN-2026-08-11-8842",
+                        "amount_minor": 5_000_000,
+                        "currency": "NGN",
+                        "description": "Transfer to GTBank ****4421",
+                        "status": "failed",
+                    }
+                ],
+            )
+        return token, session
+
+    return _make
+
+
+@pytest.fixture
+def widget_client(session_for):
+    def _make(tenant, customer_ref="usr_9931", transactions=None):
+        from rest_framework.test import APIClient
+
+        token, session = session_for(tenant, customer_ref, transactions)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        return client, session
+
+    return _make
+
+
+@pytest.fixture(autouse=True)
+def _clean_session_store():
+    """Sessions live in Redis, which no test transaction rolls back."""
+    yield
+    try:
+        from disputeshield.api import sessions
+
+        client = sessions._client()
+        keys = client.keys(f"{sessions.NAMESPACE}:*")
+        if keys:
+            client.delete(*keys)
+    except Exception as exc:
+        # Best effort. A Redis that is down fails the tests that need it, loudly,
+        # and should not also fail the ones that do not.
+        print(f"session store cleanup skipped: {exc}")

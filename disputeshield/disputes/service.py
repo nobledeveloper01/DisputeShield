@@ -45,7 +45,8 @@ class ActorNotPermitted(ValueError):
 def file_dispute(
     *,
     tenant,
-    customer_ref: str,
+    customer_ref: str = "",
+    customer_ref_hash: str = "",
     category: str,
     description: str,
     policy_version,
@@ -58,6 +59,13 @@ def file_dispute(
     actor_type: str = "api_key",
     actor_id: str = "",
 ) -> Dispute:
+    # The widget only ever holds the hash — the raw reference stays on the
+    # fintech's backend, which is the point of §8.4. Server-side callers pass the
+    # raw value and we hash it here; exactly one of the two is required.
+    if bool(customer_ref) == bool(customer_ref_hash):
+        raise ValueError("pass exactly one of customer_ref or customer_ref_hash")
+    customer_ref_hash = customer_ref_hash or hash_customer_ref(tenant, customer_ref)
+
     # Checked here rather than left to surface from inside the audit append three
     # frames down. The default pair (`api_key`, `""`) is not a usable combination,
     # and a caller who accepts the defaults deserves to be told that by the
@@ -89,7 +97,7 @@ def file_dispute(
         dispute = Dispute.objects.create(
             tenant=tenant,
             reference=_reference(tenant),
-            customer_ref_hash=hash_customer_ref(tenant, customer_ref),
+            customer_ref_hash=customer_ref_hash,
             customer_display_name=display_name,
             category=category,
             subcategory=subcategory,
@@ -249,8 +257,11 @@ def add_message(
             event_type="dispute.message_added",
             subject_type="dispute",
             subject_id=dispute.pk,
-            actor_type="user" if author_type == "agent" else author_type,
-            actor_id=author_id,
+            # An agent is a `user`; a customer is a `customer`, identified by the
+            # pseudonymous hash the case already carries. Recording a customer's
+            # own words as `api_key` would attribute them to the integration.
+            actor_type="user" if author_type == "agent" else str(author_type),
+            actor_id=author_id or (dispute.customer_ref_hash if author_type == "customer" else ""),
             payload={
                 "message_id": message.pk,
                 "visibility": visibility,

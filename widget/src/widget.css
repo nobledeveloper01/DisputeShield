@@ -1,0 +1,65 @@
+/* The widget's fixed properties are layout, spacing, motion and accessibility.
+   Everything visual is the tenant's (DESIGN.md) — no DisputeShield brand colour
+   renders inside a customer's page. */
+:root {
+  --ds-primary: #0b5fff;
+  --ds-radius: 8px;
+  --ds-ink: #16161a;
+  --ds-muted: #5c5f66;
+  --ds-line: #e4e4e2;
+  --ds-bg: #fff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ds-ink);
+  background: var(--ds-bg);
+}
+
+.ds-root { padding: 16px; width: 360px; max-width: 100%; }
+.ds-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ds-title { font-size: 18px; margin: 0 0 8px; }
+.ds-title:focus-visible { outline: 2px solid var(--ds-primary); outline-offset: 2px; }
+.ds-close { background: none; border: 0; font-size: 22px; cursor: pointer; color: var(--ds-muted); }
+.ds-hint, .ds-empty { color: var(--ds-muted); margin: 0 0 12px; }
+.ds-list { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
+.ds-option {
+  width: 100%; display: flex; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; border: 1px solid var(--ds-line); border-radius: var(--ds-radius);
+  background: var(--ds-bg); text-align: left; cursor: pointer; font: inherit;
+}
+.ds-option[aria-checked="true"] { border-color: var(--ds-primary); box-shadow: 0 0 0 1px var(--ds-primary); }
+.ds-option-amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ds-label { display: block; font-weight: 600; margin: 12px 0 4px; }
+.ds-input {
+  width: 100%; padding: 10px 12px; font: inherit;
+  border: 1px solid var(--ds-line); border-radius: var(--ds-radius); background: var(--ds-bg);
+}
+.ds-actions { display: flex; gap: 8px; margin-top: 16px; }
+.ds-primary, .ds-secondary {
+  flex: 1; padding: 10px 14px; font: inherit; border-radius: var(--ds-radius); cursor: pointer;
+  border: 1px solid var(--ds-primary);
+}
+.ds-primary { background: var(--ds-primary); color: #fff; }
+.ds-primary[disabled] { opacity: .5; cursor: not-allowed; }
+.ds-secondary { background: transparent; color: var(--ds-primary); }
+.ds-summary { margin: 0; display: grid; grid-template-columns: 1fr; gap: 2px; }
+.ds-summary dt { font-weight: 600; margin-top: 8px; }
+.ds-summary dd { margin: 0; color: var(--ds-muted); }
+.ds-error { color: #b42318; }
+.ds-reference { font-size: 16px; }
+.ds-progress { display: flex; gap: 12px; list-style: none; padding: 16px 0 0; margin: 0; color: var(--ds-muted); font-size: 13px; }
+.ds-progress [aria-current="step"] { color: var(--ds-ink); font-weight: 600; }
+.ds-visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+:where(button, select, textarea):focus-visible { outline: 2px solid var(--ds-primary); outline-offset: 2px; }
+
+/* Under 150ms or not at all (DESIGN.md), and nothing moves for a reader who
+   asked for less motion. */
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

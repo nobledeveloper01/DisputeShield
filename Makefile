@@ -67,9 +67,22 @@ security:  ## SAST, dependency audit, secret scan
 	$(PY) -m pip_audit
 	gitleaks detect --no-banner
 
+.PHONY: widget
+widget:  ## Build the loader and the widget, and publish the bundle
+	npm ci --prefix loader && npm run build --prefix loader
+	npm ci --prefix widget && npm run build --prefix widget
+	mkdir -p static/widget && cp widget/dist/widget.js widget/dist/widget.css static/widget/
+	scripts/check-loader-size.sh
+	npm test --prefix loader
+
+.PHONY: browser
+browser: widget  ## Isolation, keyboard and axe gates in a real browser
+	npx --prefix widget playwright install chromium
+	npm run test:e2e --prefix widget
+
 .PHONY: hello
 hello:  ## Empty database to a filed dispute with a computed deadline
 	scripts/hello-world.sh
 
 .PHONY: ci
-ci: lint migrations-check test gates security  ## Everything CI runs
+ci: lint migrations-check test gates security widget  ## Everything CI runs

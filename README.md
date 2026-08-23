@@ -237,6 +237,11 @@ ten seconds.
 There is no inline fallback. A fallback that degrades to the insecure mode under
 conditions nobody tests *is* the insecure mode. → [ADR-0001](docs/adr/0001-sandboxed-iframe-widget.md)
 
+The loader is **1,035 bytes gzipped** — a quarter of its budget — and CI fails
+the build if it grows past 4 KB. That budget protects reviewability, not
+performance: it is the only DisputeShield code that runs in your page, and it
+stays small enough for your engineer to read in full before shipping it.
+
 ### The publishable key can read nothing
 
 It loads configuration and theming. Every data operation requires a server-minted
@@ -247,7 +252,12 @@ never trusted with the question.
 
 Tokens are opaque and Redis-backed rather than JWTs, so they can be revoked —
 one session, every session for a customer, or every session minted by one key.
-→ [ADR-0002](docs/adr/0002-opaque-session-tokens.md)
+The last is your response to a leaked secret key, and it works immediately rather
+than after a rotation completes. → [ADR-0002](docs/adr/0002-opaque-session-tokens.md)
+
+The token reaches the widget over `postMessage`, after the widget announces it is
+listening, addressed to the widget's own origin — **never in the iframe's URL**,
+where it would end up in logs, referrers and browser history.
 
 ### A pausable clock is an abusable clock
 

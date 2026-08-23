@@ -20,12 +20,21 @@ class APIKey(models.Model):
         TEST = "test", "Test"
         LIVE = "live", "Live"
 
+    class Kind(models.TextChoices):
+        SECRET = "secret", "Secret — server-side only"
+        PUBLISHABLE = "publishable", "Publishable — safe to embed in a public page"
+
     id = models.CharField(primary_key=True, max_length=32, default=api_key_id, editable=False)
     tenant = models.ForeignKey(
         "disputeshield.Tenant", on_delete=models.PROTECT, related_name="api_keys"
     )
     name = models.CharField(max_length=128)
     environment = models.CharField(max_length=8, choices=Environment.choices)
+    # §4.3: the publishable key can do nothing but load configuration and theming.
+    # There is no code path from a publishable key to a dispute record, and
+    # `tests/test_widget_api.py` asserts that against every widget endpoint rather
+    # than a sample — a sample proves only that the paths we thought of are closed.
+    kind = models.CharField(max_length=16, choices=Kind.choices, default=Kind.SECRET)
 
     # Plaintext, for lookup and for showing the user which key this is.
     prefix = models.CharField(max_length=16, db_index=True)

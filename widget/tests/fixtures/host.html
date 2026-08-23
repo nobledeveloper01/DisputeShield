@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Acme Payments — hostile host page</title>
+</head>
+<body>
+<!--
+  A deliberately hostile host page.
+
+  It holds a fake secret in a form field and on `window`, exactly as a real
+  fintech page would hold an account number and a session identifier, then tries
+  every route into the widget a compromised host script would try. The widget
+  must be unable to read any of it, and the host must be unable to read anything
+  of the widget's.
+-->
+<h1>Acme Payments</h1>
+
+<form id="transfer">
+  <label for="account">Account number</label>
+  <input id="account" name="account" value="0123456789" />
+  <label for="amount">Amount</label>
+  <input id="amount" name="amount" value="50000.00" />
+</form>
+
+<button id="report" type="button">Report a problem</button>
+
+<script>
+  // The things a compromised host script would go looking for.
+  window.HOST_SECRET = 'account-0123456789';
+  document.cookie = 'host_session=super-secret-value; path=/';
+  try { localStorage.setItem('host_token', 'host-storage-secret'); } catch (e) {}
+</script>
+<script src="/loader.js"></script>
+<script>
+  window.__widget = DisputeShield.init({
+    publishableKey: 'pk_test_e2e_0000000000000000000000000000',
+    baseUrl: window.__WIDGET_ORIGIN__,
+    sessionToken: '__SESSION_TOKEN__',
+    onEvent: function (event) {
+      (window.__events = window.__events || []).push(event.type);
+    }
+  });
+</script>
+</body>
+</html>

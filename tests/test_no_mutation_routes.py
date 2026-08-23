@@ -97,28 +97,40 @@ class TestNoMutationRoutes:
             assert "save" in vars(model), f"{model.__name__} does not guard save()"
 
     def test_the_service_layer_is_the_only_module_that_writes_a_dispute(self):
-        """Greps the API package for direct ORM writes to auditable models.
+        """Greps the API package for direct ORM *writes* to auditable models.
 
-        Crude, and it catches the realistic mistake: someone in a hurry reaching
-        for `Dispute.objects.create` or `.update()` inside a view because the
-        service function did not quite fit.
+        Reads are fine and necessary — a view has to scope a queryset. What this
+        catches is the realistic mistake: someone reaching for
+        `Dispute.objects.create` or `.update()` inside a view because the service
+        function did not quite fit, and leaving the audit record behind.
         """
         import pathlib
+        import re
 
         api_dir = pathlib.Path(__file__).resolve().parent.parent / "disputeshield" / "api"
+        models = ("Dispute", "DisputeMessage", "SLAEvent", "AuditRecord", "SLAClock")
+        writes = (
+            "create",
+            "bulk_create",
+            "update",
+            "bulk_update",
+            "delete",
+            "get_or_create",
+            "update_or_create",
+        )
+        pattern = re.compile(
+            r"\b(" + "|".join(models) + r")\.objects"
+            r"(?:\.[a-z_]+\([^)]*\))*"
+            r"\.(" + "|".join(writes) + r")\("
+        )
+
         offenders = []
-        for path in api_dir.rglob("*.py"):
-            source = path.read_text()
-            for model in ("Dispute", "DisputeMessage", "SLAEvent", "AuditRecord"):
-                for call in (
-                    f"{model}.objects.create",
-                    f"{model}.objects.update",
-                    f"{model}.objects.filter",
-                ):
-                    if f"{call}(" in source and "update(last_used_at" not in source:
-                        offenders.append(f"{path.name}: {call}")
+        for path in sorted(api_dir.rglob("*.py")):
+            for number, line in enumerate(path.read_text().splitlines(), start=1):
+                if pattern.search(line):
+                    offenders.append(f"{path.name}:{number}: {line.strip()}")
 
         assert not offenders, (
-            "the API layer writes auditable models directly instead of going "
-            f"through disputeshield.disputes.service: {offenders}"
+            "the API layer writes auditable models directly instead of going through "
+            "disputeshield.disputes.service:\n  " + "\n  ".join(offenders)
         )

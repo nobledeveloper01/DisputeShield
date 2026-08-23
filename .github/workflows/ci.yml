@@ -173,35 +173,85 @@ jobs:
           path: sbom.json
 
   frontend:
-    # Lights up in phase 4, when there is a widget to isolate and a loader to
-    # weigh. Skipping until then beats a red build nobody can act on.
+    # The loader carries the boundary the whole product is sold on, so its tests
+    # and its size budget run on every push — no browser needed for either.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - id: exists
-        run: |
-          if [ -f widget/package.json ]; then echo "built=true" >> "$GITHUB_OUTPUT"; else
-            echo "widget/ is not built yet — phase 4 (docs/ROADMAP.md)"
-            echo "built=false" >> "$GITHUB_OUTPUT"
-          fi
       - uses: actions/setup-node@v4
-        if: steps.exists.outputs.built == 'true'
         with:
           node-version: "22"
-      - if: steps.exists.outputs.built == 'true'
-        run: npm ci --prefix widget && npm run build --prefix widget
+          cache: npm
+          cache-dependency-path: loader/package-lock.json
+
+      - run: npm ci --prefix loader
+      - run: npm run build --prefix loader
       - name: loader stays under 4KB gzipped (ADR-0001)
-        if: steps.exists.outputs.built == 'true'
         run: scripts/check-loader-size.sh
-      - name: playwright — widget isolation in both directions
-        if: steps.exists.outputs.built == 'true'
-        run: npx playwright test --prefix widget
-      - name: axe-core plus a keyboard-only filing walkthrough (§9)
-        if: steps.exists.outputs.built == 'true'
-        run: npm run test:a11y --prefix widget && npm run test:keyboard --prefix widget
+      - name: the loader's origin and protocol checks
+        run: npm test --prefix loader
+
+      - run: npm ci --prefix widget
+      - run: npm run build --prefix widget
+
+  browser:
+    # The gates that need a real browser and a real second origin. Split from
+    # `frontend` because it needs the whole stack up, and a slow job that only
+    # sometimes matters is a job people learn to skip.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: disputeshield_owner
+          POSTGRES_PASSWORD: disputeshield
+          POSTGRES_DB: disputeshield
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U disputeshield_owner"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+      redis-cache:
+        image: redis:7-alpine
+        ports: ["6380:6379"]
+      redis-broker:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - run: python -m venv .venv && .venv/bin/pip install -e ".[dev,server]"
+      - name: Create the restricted application role
+        run: psql "postgres://disputeshield_owner:disputeshield@localhost:5432/disputeshield" -f scripts/init-app-role.sql
+        env:
+          PGPASSWORD: disputeshield
+
+      - run: npm ci --prefix loader && npm run build --prefix loader
+      - run: npm ci --prefix widget && npm run build --prefix widget
+      - name: Publish the built bundle where the embed document expects it
+        run: mkdir -p static/widget && cp widget/dist/widget.js widget/dist/widget.css static/widget/
+
+      - run: npx --prefix widget playwright install --with-deps chromium
+
+      - name: widget isolation in both directions, in a real browser (ADR-0001)
+        run: npm run test:e2e --prefix widget
+        env:
+          DISPUTESHIELD_ALLOWED_HOSTS: localhost,127.0.0.1,testserver
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: widget/test-results/
 
   build:
-    needs: [quality, gates, security, frontend]
+    needs: [quality, gates, security, frontend, browser]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

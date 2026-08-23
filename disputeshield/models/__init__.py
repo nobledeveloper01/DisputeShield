@@ -19,10 +19,12 @@ from disputeshield.models.dispute import (
 )
 from disputeshield.models.policy import SLAPolicy, SLAPolicyVersion
 from disputeshield.models.tenant import Tenant
+from disputeshield.models.widget import AllowedOrigin, WidgetConfig, validate_origin
 
 __all__ = [
     "APIKey",
     "Agent",
+    "AllowedOrigin",
     "AuditRecord",
     "BusinessCalendar",
     "BusinessHoursWindow",
@@ -40,5 +42,7 @@ __all__ = [
     "Status",
     "SweepHeartbeat",
     "Tenant",
+    "WidgetConfig",
     "hash_customer_ref",
+    "validate_origin",
 ]

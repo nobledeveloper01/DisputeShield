@@ -1,0 +1,143 @@
+"""`GET /v1/embed` — the document that runs inside the sandboxed iframe (D9).
+
+Two artefacts with two caching policies, and conflating them is a real breach:
+
+  * **This document is dynamic**, rendered per publishable key, cached privately
+    for a minute, carrying the tenant's own `frame-ancestors`.
+  * **The bundles it references are static**, tenant-independent, content-hashed
+    and cached for a year.
+
+Caching this document publicly would hand one tenant another tenant's
+`frame-ancestors`, turning the product's headline security control into a shared
+misconfiguration (§10.1).
+
+It is also the natural place to notice §11.6's most common support ticket: a
+tenant added a domain and did not register it. A load from an unregistered origin
+is recorded here, so an operator reads the diagnosis rather than deducing it.
+"""
+
+from __future__ import annotations
+
+import logging
+
+from django.http import HttpResponse
+from django.utils.html import escape
+from rest_framework.views import APIView
+
+from disputeshield.api.authentication import SilentPublishableKeyAuthentication
+from disputeshield.models import AllowedOrigin, WidgetConfig
+
+logger = logging.getLogger(__name__)
+
+BUNDLE_URL = "/static/widget/widget.js"
+
+TEMPLATE = """<!doctype html>
+<html lang="{locale}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Report a problem</title>
+<link rel="stylesheet" href="{stylesheet}">
+</head>
+<body data-key="{publishable_key}" data-origin="{parent_origin}">
+<div id="disputeshield-root"></div>
+<script src="{bundle}" defer></script>
+</body>
+</html>
+"""
+
+
+def content_security_policy(frame_ancestors: str, api_origin: str) -> str:
+    """§10.1, generated per tenant.
+
+    `default-src 'none'` first, so anything not named below is refused rather
+    than inherited. No `unsafe-inline` anywhere: dispute descriptions are
+    attacker-controlled text rendered in a browser, and an inline-script
+    allowance is what turns that from an inconvenience into an XSS.
+    """
+    return "; ".join(
+        [
+            "default-src 'none'",
+            "script-src 'self'",
+            "style-src 'self'",
+            f"connect-src {api_origin}",
+            "img-src 'self' data:",
+            "font-src 'self'",
+            f"frame-ancestors {frame_ancestors}",
+            "base-uri 'none'",
+            "form-action 'none'",
+            "object-src 'none'",
+        ]
+    )
+
+
+class EmbedView(APIView):
+    authentication_classes = [SilentPublishableKeyAuthentication]
+    permission_classes = []
+
+    def get(self, request):
+        user = getattr(request, "user", None)
+        if user is None or not hasattr(user, "api_key"):
+            # Fail closed and quietly (§8.6 principle 1). No detail, and nothing
+            # that renders on the host's page.
+            return self._closed("unknown_key")
+
+        tenant = user.tenant
+        config = WidgetConfig.objects.filter(tenant=tenant).first()
+        origins = list(AllowedOrigin.objects.values_list("origin", flat=True))
+        referring_origin = _origin_of(request.META.get("HTTP_REFERER", ""))
+
+        if referring_origin and referring_origin not in origins:
+            # §11.6's first diagnosis, recorded rather than deduced.
+            logger.warning(
+                "widget load from an unregistered origin",
+                extra={
+                    "tenant": tenant.pk,
+                    "origin": referring_origin,
+                    "registered": origins,
+                },
+            )
+            return self._closed("unregistered_origin", origin=referring_origin)
+
+        frame_ancestors = " ".join(origins) if origins else "'none'"
+        body = TEMPLATE.format(
+            locale=escape(config.locale if config else "en"),
+            publishable_key=escape(request.query_params.get("k", "")),
+            parent_origin=escape(referring_origin),
+            bundle=BUNDLE_URL,
+            stylesheet="/static/widget/widget.css",
+        )
+
+        response = HttpResponse(body, content_type="text/html; charset=utf-8")
+        response["Content-Security-Policy"] = content_security_policy(
+            frame_ancestors, _api_origin(request)
+        )
+        # Private and short: the document varies per tenant, so a shared cache
+        # holding it is the misconfiguration described above.
+        response["Cache-Control"] = "private, max-age=60"
+        response["X-Frame-Options"] = "ALLOWALL" if origins else "DENY"
+        response["Referrer-Policy"] = "strict-origin"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    def _closed(self, reason: str, origin: str = "") -> HttpResponse:
+        response = HttpResponse("", status=403, content_type="text/html; charset=utf-8")
+        response["Content-Security-Policy"] = content_security_policy("'none'", "'none'")
+        response["Cache-Control"] = "no-store"
+        response["X-DisputeShield-Closed"] = reason
+        return response
+
+
+def _origin_of(referer: str) -> str:
+    from urllib.parse import urlparse
+
+    if not referer:
+        return ""
+    parsed = urlparse(referer)
+    if not parsed.scheme or not parsed.netloc:
+        return ""
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _api_origin(request) -> str:
+    return f"{request.scheme}://{request.get_host()}"

@@ -9,6 +9,82 @@ and released from one tag.
 
 ## [Unreleased]
 
+### Added — phase 4, the widget and its boundary
+
+- `loader/` — **1,035 bytes gzipped**, a quarter of ADR-0001's 4 KB budget. It
+  creates the sandboxed cross-origin iframe and does nothing else. No fetch, no
+  cookie access, no DOM queries into the host page — asserted by a test that
+  greps its own source, because the budget protects reviewability and the grep
+  protects the claim.
+- The `postMessage` protocol, symmetric and validated on both sides: fixed
+  envelope, protocol version, an allowlist per direction, origin **and**
+  `event.source` checked, and never `'*'` as a target origin.
+- Session tokens (§4.3, ADR-0002): opaque, Redis-backed, hashed at rest, scoped
+  to exactly one customer, revocable one session at a time, per customer, or per
+  minting key. The last is the response to a leaked secret key and is available
+  immediately rather than after a rotation completes.
+- **The token is handed to the widget over `postMessage`, never in the iframe
+  URL** (§10). It is sent only after the widget announces it is listening, only
+  to the widget's own origin, and only once.
+- `POST /v1/sessions`, the widget API of §7.2, and the transaction picker fed
+  from the list the fintech supplied at mint time — so a customer can only
+  dispute their own transactions, enforced rather than assumed.
+- Publishable keys as a distinct kind with a distinct `pk_` prefix and a distinct
+  principal class, so one cannot satisfy a permission written for the other by
+  accident.
+- `AllowedOrigin` with validation that refuses a path, a wildcard or `null` — a
+  path is the dangerous one, because `frame-ancestors` ignores it and the tenant
+  believes they restricted a page when they authorised a host.
+- `GET /v1/embed` (D9): dynamic, per-tenant CSP, privately cached for a minute,
+  referencing bundles that are static and cached for a year. A load from an
+  unregistered origin is refused **and recorded**, because §11.6 says that is the
+  most common widget support ticket by a wide margin.
+- The React widget: one decision per screen, the expected resolution date shown
+  before submission, and focus moved to each step's heading so a screen reader
+  announces it.
+- `/healthz` and `/readyz`. Readiness includes the audit immutability trigger —
+  a deployment that can accept writes but cannot make them immutable should not
+  be taking traffic.
+
+### Fixed — during phase 4
+
+- **`role="radiogroup"` on a `<ul>` stripped its list semantics**, orphaning the
+  `<li>` children. Found by axe-core, not by review.
+- **A customer's own message could not be audited.** `add_message` passed
+  `customer` as an actor type and the audit trail accepted only
+  system/user/api_key. Recording a customer's words as `api_key` would attribute
+  them to the fintech's integration, so `customer` is now a first-class actor
+  identified by the pseudonymous hash the case already carries.
+- **The embed document answered an unknown key with a JSON 401.** That body is
+  what would render inside a customer-facing page on a fintech's site. It now
+  fails closed *and quietly* — empty 403, deny-everything CSP — via an
+  authenticator used on that one surface and nowhere else.
+- **The widget's inbound and outbound message allowlists were the same set**, so
+  a type added for one direction became valid in the other.
+- **The direct-write grep gate flagged reads.** `Dispute.objects.filter` in a
+  view is a scoped queryset, not a bypassed audit trail; the matcher now targets
+  write methods only.
+
+### Tests — 213 Python, 19 loader, 13 browser
+
+- `tests/isolation.spec.js` — Playwright, two real origins, a deliberately
+  hostile host page holding a fake account number in a form field, on `window`,
+  in a cookie and in `localStorage`. Asserted in both directions: the host cannot
+  read the iframe's document or globals; the widget cannot reach
+  `window.parent.HOST_SECRET`, the host's DOM, its cookies or its storage.
+- `tests/keyboard.spec.js` — the **complete** filing flow driven by Tab, Enter,
+  Space and typing only, ending at a filed case with a reference. §9 makes this a
+  regulatory obligation, and the iframe boundary is what makes it hard.
+- `tests/a11y.spec.js` — axe-core at **every** step, not just the first. The
+  screens a customer reaches after a decision are the ones nobody looks at.
+- `tests/test_widget_api.py` — the publishable key is asserted to reach no data
+  route, parameterised over every route rather than sampling one; a session token
+  cannot cross customers or tenants; a transaction reference outside the session
+  is refused.
+- `tests/test_widget_embed.py` — per-tenant `frame-ancestors`, no
+  `unsafe-inline`, never publicly cacheable, and the document contains no inline
+  script its own CSP would block.
+
 ### Added — phase 3, the management API and the case lifecycle
 
 - `Dispute` and `DisputeMessage`. Messages are immutable with no edit path — a

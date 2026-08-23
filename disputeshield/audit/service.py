@@ -24,6 +24,8 @@ from disputeshield.models import AuditRecord, Tenant
 from disputeshield.tenancy import context
 from disputeshield.tenancy.middleware import db_tenant_context
 
+ACTOR_TYPES = frozenset({"system", "user", "api_key", "customer"})
+
 
 class ActorRequired(ValueError):
     """An unattributed state change is not evidence of anything."""
@@ -52,9 +54,14 @@ def append(
     occurred_at=None,
     corrects: str = "",
 ) -> AuditRecord:
-    if actor_type not in {"system", "user", "api_key"}:
+    # §8.3 lists system|user|api_key. `customer` is added deliberately: a customer
+    # filing a case or replying to one is an actor whose actions are evidence, and
+    # recording them as `api_key` would attribute the customer's own words to the
+    # fintech's integration. They are identified by their pseudonymous
+    # `customer_ref_hash`, which is attributable without being identifying.
+    if actor_type not in ACTOR_TYPES:
         raise ActorRequired(
-            f"actor_type must be one of system|user|api_key, got {actor_type!r}. "
+            f"actor_type must be one of {'|'.join(sorted(ACTOR_TYPES))}, got {actor_type!r}. "
             "Every audit record names who acted, including the scheduler."
         )
     if actor_type != "system" and not actor_id:

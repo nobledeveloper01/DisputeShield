@@ -20,3 +20,6 @@ sbom.json
 
 # Working conventions for the coding agent. Local, like the sibling projects.
 CLAUDE.md
+static/widget/
+widget/test-results/
+widget/playwright-report/

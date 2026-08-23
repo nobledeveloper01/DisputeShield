@@ -55,7 +55,10 @@ MIDDLEWARE = [
 ]
 
 REST_FRAMEWORK = {
+    # Order matters: each authenticator returns None for a credential that is not
+    # its own, so a session token never resolves as an API key and vice versa.
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "disputeshield.api.authentication.SessionTokenAuthentication",
         "disputeshield.api.authentication.APIKeyAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
@@ -156,6 +159,9 @@ TIME_ZONE = "UTC"  # §4.4: all arithmetic in UTC. Calendars resolve their own z
 USE_I18N = True
 USE_TZ = True
 STATIC_URL = "static/"
+# The built widget bundle. Content-independent and tenant-independent, so it is
+# cached for a year while the embed document that references it is not (D9).
+STATICFILES_DIRS = [BASE_DIR / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGGING = {
