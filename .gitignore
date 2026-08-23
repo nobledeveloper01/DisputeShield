@@ -17,3 +17,6 @@ dashboard/dist/
 loader/dist/
 sbom.json
 .DS_Store
+
+# Working conventions for the coding agent. Local, like the sibling projects.
+CLAUDE.md

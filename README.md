@@ -497,7 +497,6 @@ for anything in them, so the cut line is obvious and lands somewhere defensible.
 | [`docs/adr/`](docs/adr/) | Architecture decision records |
 | [`docs/runbook-sla-sweep.md`](docs/runbook-sla-sweep.md) | The most important runbook in the product |
 | [`DESIGN.md`](DESIGN.md) | The design system. Read before any visual decision |
-| [`CLAUDE.md`](CLAUDE.md) | Conventions for working in this repository |
 
 ---
 
