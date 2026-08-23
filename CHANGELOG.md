@@ -65,6 +65,21 @@ and released from one tag.
 
 ### Changed
 
+- CI now asserts what exists at the current phase. The frontend and image jobs are
+  gated on their artefacts existing and light up in phases 4 and 6 — a job that
+  asserts something the code cannot yet do is a red build that teaches people to
+  ignore red builds, and one that passes vacuously is worse because it looks like
+  coverage.
+- Container image vulnerability gating split in two: HIGH and CRITICAL findings
+  **with an available fix** block the build, while the full report including
+  unfixed findings is published as an artefact. A gate that fails on
+  vulnerabilities with no patch anywhere can never go green, and the only thing
+  it reliably produces is a team that has learned to bypass it.
+- The image applies `apt-get upgrade` at build time, so a Debian package fixed
+  upstream cannot sit unapplied while §8.5's published remediation SLAs run down.
+- `ruff format` no longer rewrites Python code blocks inside Markdown. The
+  specification, the ADRs and the README are source documents whose examples are
+  written for a reader.
 - Local host ports moved to a dedicated block (Postgres 55433, PgBouncer 56432,
   Redis 56380/56381, Mailpit 8026) so DisputeShield coexists with the sibling
   projects on one machine.
