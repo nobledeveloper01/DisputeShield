@@ -39,13 +39,31 @@ jobs:
         # A landing page that reaches out to a CDN is a page that breaks when
         # the CDN does, and leaks a visitor's IP to a third party. Neither is
         # acceptable for a static pitch, so it is enforced rather than trusted.
+        #
+        # Code samples are stripped before the check. An escaped `&lt;script
+        # src="…"&gt;` inside <pre> is text the browser renders, not an asset it
+        # fetches, and failing the build on it teaches people to delete the
+        # example rather than to inline the asset.
         run: |
-          if grep -nEo '(src|href)="https?://[^"]+' site/index.html \
-             | grep -vE 'https://github\.com|https://[a-z0-9-]+\.github\.io'; then
-            echo "::error::site/index.html loads a remote asset; inline it instead"
-            exit 1
-          fi
-          echo "no remote assets"
+          python3 - <<'EOF'
+          import re, sys
+
+          html = open("site/index.html", encoding="utf-8").read()
+          html = re.sub(r"<pre\b.*?</pre>", "", html, flags=re.S | re.I)
+          html = re.sub(r"<code\b.*?</code>", "", html, flags=re.S | re.I)
+
+          allowed = re.compile(r"^https://(github\.com|[a-z0-9-]+\.github\.io)/")
+          remote = [
+              url
+              for _, url in re.findall(r'(src|href)="(https?://[^"]+)"', html)
+              if not allowed.match(url)
+          ]
+          if remote:
+              for url in remote:
+                  print(f"::error::site/index.html loads a remote asset: {url}")
+              sys.exit(1)
+          print("no remote assets")
+          EOF
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
