@@ -157,7 +157,12 @@ def _api_origin(request) -> str:
     if configured:
         return configured
     if settings.DEBUG:
-        return f"{request.scheme}://{request.get_host()}"  # nosec B608
+        # nosemgrep: python.flask.security.audit.directly-returned-format-string
+        # The rule looks for a Flask view returning a formatted response body.
+        # This is a Django helper returning an origin for a CSP directive, on a
+        # branch that cannot execute in production, from a host Django has
+        # already validated against ALLOWED_HOSTS.
+        return f"{request.scheme}://{request.get_host()}"
     # No configured origin in production means the widget calls nowhere, which
     # fails closed rather than guessing.
     return "'none'"
