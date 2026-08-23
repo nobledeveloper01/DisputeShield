@@ -164,7 +164,7 @@ def _api_origin(request) -> str:
         # the line itself — semgrep only reads the offending line and the one
         # immediately above it.
         scheme, host = request.scheme, request.get_host()
-        return f"{scheme}://{host}"  # nosemgrep: python.flask.security.audit.directly-returned-format-string
+        return f"{scheme}://{host}"  # nosemgrep: python.flask.security.audit.directly-returned-format-string.directly-returned-format-string
     # No configured origin in production means the widget calls nowhere, which
     # fails closed rather than guessing.
     return "'none'"

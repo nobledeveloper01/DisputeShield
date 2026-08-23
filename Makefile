@@ -64,7 +64,8 @@ migrations-check:  ## Fail if a model change has no migration
 .PHONY: security
 security:  ## SAST, dependency audit, secret scan
 	$(PY) -m bandit -r disputeshield/ -q
-	$(PY) -m pip_audit
+	$(PY) -m pip_audit --skip-editable
+	$(PY) -m semgrep --config p/python --config p/django --error --quiet .
 	gitleaks detect --no-banner
 
 .PHONY: widget

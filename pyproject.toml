@@ -37,6 +37,7 @@ dev = [
     "bandit>=1.7",
     "pip-audit>=2.7",
     "playwright>=1.47",
+    "semgrep>=1.90",
 ]
 server = [
     "gunicorn>=23.0",

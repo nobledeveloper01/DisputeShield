@@ -156,10 +156,14 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: bandit -r disputeshield/ -q
       - run: pip-audit --skip-editable
-      - uses: returntocorp/semgrep-action@v1
-        with:
-          config: p/python
-        continue-on-error: false
+      # Run through pip rather than the action: the action pins a semgrep old
+      # enough that its own maintainers refuse it, and old enough to ignore
+      # inline `nosemgrep` pragmas. Running it this way also means `make security`
+      # and CI execute the same command, which is the point of the Makefile.
+      - name: SAST
+        run: |
+          pip install semgrep
+          semgrep --config p/python --config p/django --error --quiet .
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
