@@ -10,6 +10,14 @@ RUN pip wheel --no-cache-dir --wheel-dir /wheels ".[server]"
 FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 
+# Apply whatever the distribution has already fixed. The base image is rebuilt
+# on its own cadence, not ours, so without this a patched Debian package can sit
+# unapplied in our image for weeks — and §8.5 publishes remediation SLAs we would
+# then be missing for reasons entirely within our control.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd -r disputeshield && useradd -r -g disputeshield disputeshield
 
 COPY --from=builder /wheels /wheels

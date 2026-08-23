@@ -183,8 +183,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker buildx build -t disputeshield:ci .
-      - uses: aquasecurity/trivy-action@master
+
+      # Blocking: HIGH and CRITICAL that have a fix available. `ignore-unfixed`
+      # is not a softening — a gate that fails on vulnerabilities with no patch
+      # anywhere is a gate that can never go green, and the only thing it
+      # reliably produces is a team that has learned to bypass it.
+      - name: Vulnerabilities with an available fix fail the build
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: disputeshield:ci
           exit-code: "1"
           severity: HIGH,CRITICAL
+          ignore-unfixed: true
+
+      # Non-blocking, and published: unfixed vulnerabilities are still our
+      # customer's exposure, so they are reported rather than quietly excluded.
+      # §8.5 promises a customer's security team can assess DisputeShield without
+      # asking, and that promise covers the ones we cannot fix yet.
+      - name: Full report, including vulnerabilities with no fix available
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: disputeshield:ci
+          exit-code: "0"
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-unfixed.sarif
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-unfixed.sarif
