@@ -31,7 +31,7 @@ from disputeshield.tenancy.middleware import db_tenant_context
 # `handle()` refuses to seed anything that is not a test key. A leaked test key
 # can do nothing to live data (§8.2).
 PUBLISHABLE_KEY = "pk_test_e2e_0000000000000000000000000000"
-E2E_SECRET_KEY = "ds_test_e2e_0000000000000000000000000000"  # noqa: S105
+E2E_SECRET_KEY = "ds_test_e2e_0000000000000000000000000000"  # noqa: S105  # nosec B105
 HOST_ORIGIN = "http://localhost:4180"
 
 
