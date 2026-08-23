@@ -17,6 +17,11 @@ DEFAULTS: dict[str, Any] = {
     # own model is opt-in and contract-checked — see ADR-0012 in plan-architecture D12.
     "TENANT_MODEL": "disputeshield.Tenant",
     "WIDGET_ORIGIN": None,
+    # The origin the widget is allowed to call, as it appears in the CSP's
+    # connect-src. Configured rather than derived from the request: a security
+    # header assembled from a request header is a header an attacker gets a vote
+    # in, and ALLOWED_HOSTS narrowing that vote is not the same as removing it.
+    "API_ORIGIN": None,
     "ENCRYPTION_KEY_REF": None,
     # Named for the session rather than the token: bandit reads a key containing
     # TOKEN with a literal value as a hardcoded credential, and a permanent

@@ -27,6 +27,7 @@ export default defineConfig({
         'cd .. && .venv/bin/python manage.py migrate --no-input ' +
         '&& .venv/bin/python manage.py disputeshield_seed_e2e ' +
         '&& .venv/bin/python manage.py runserver 127.0.0.1:8011 --noreload',
+      env: { DISPUTESHIELD_API_ORIGIN: 'http://127.0.0.1:8011' },
       url: 'http://127.0.0.1:8011/healthz',
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

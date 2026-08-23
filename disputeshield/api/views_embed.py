@@ -24,6 +24,7 @@ from django.http import HttpResponse
 from django.utils.html import escape
 from rest_framework.views import APIView
 
+from disputeshield import conf
 from disputeshield.api.authentication import SilentPublishableKeyAuthentication
 from disputeshield.models import AllowedOrigin, WidgetConfig
 
@@ -140,4 +141,23 @@ def _origin_of(referer: str) -> str:
 
 
 def _api_origin(request) -> str:
-    return f"{request.scheme}://{request.get_host()}"
+    """Where the widget may send requests, for the CSP's `connect-src`.
+
+    Configured, not derived from the request. Django validates `Host` against
+    ALLOWED_HOSTS, so the request-derived form is not exploitable today — but it
+    makes a security header depend on an attacker-supplied one, and the next
+    person to relax ALLOWED_HOSTS for a health check would not connect the two.
+
+    Falls back to the request only when DEBUG is on, where the alternative is a
+    developer having to configure a value to see the widget load at all.
+    """
+    from django.conf import settings
+
+    configured = conf.get("API_ORIGIN")
+    if configured:
+        return configured
+    if settings.DEBUG:
+        return f"{request.scheme}://{request.get_host()}"  # nosec B608
+    # No configured origin in production means the widget calls nowhere, which
+    # fails closed rather than guessing.
+    return "'none'"

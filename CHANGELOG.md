@@ -61,6 +61,13 @@ and released from one tag.
   authenticator used on that one surface and nowhere else.
 - **The widget's inbound and outbound message allowlists were the same set**, so
   a type added for one direction became valid in the other.
+- **The CSP's `connect-src` was built from the request's `Host` header.** Django
+  narrows `Host` via `ALLOWED_HOSTS`, so it was not exploitable — but it made a
+  security header depend on an attacker-supplied one, and the next person to
+  relax `ALLOWED_HOSTS` for a health check would not connect the two. It is now
+  configuration, falling back to the request only under `DEBUG` and to `'none'`
+  in production. Found by semgrep, via a Flask rule that does not apply to Django
+  and pointed at something real anyway.
 - **The direct-write grep gate flagged reads.** `Dispute.objects.filter` in a
   view is a scoped queryset, not a bypassed audit trail; the matcher now targets
   write methods only.

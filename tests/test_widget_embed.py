@@ -184,3 +184,45 @@ class TestTheDocumentItself:
             HTTP_REFERER="https://app.acme.io/x",
         )
         assert b"<script>alert(1)</script>" not in response.content
+
+
+class TestConnectSource:
+    """The CSP's connect-src is configuration, not a reflected request header."""
+
+    def test_it_uses_the_configured_api_origin(
+        self, tenant_a, publishable_key_for, allowed_origin, client, settings
+    ):
+        settings.DISPUTESHIELD = {**settings.DISPUTESHIELD, "API_ORIGIN": "https://api.example"}
+        allowed_origin(tenant_a)
+        full, _ = publishable_key_for(tenant_a)
+
+        response = embed(client, full, "https://app.acme.io/x")
+        assert directives(response)["connect-src"] == "https://api.example"
+
+    def test_a_forged_host_header_cannot_widen_it(
+        self, tenant_a, publishable_key_for, allowed_origin, client, settings
+    ):
+        """Django narrows Host via ALLOWED_HOSTS, which is not the same as
+        removing an attacker's vote in a security header."""
+        settings.DISPUTESHIELD = {**settings.DISPUTESHIELD, "API_ORIGIN": "https://api.example"}
+        settings.ALLOWED_HOSTS = ["*"]
+        allowed_origin(tenant_a)
+        full, _ = publishable_key_for(tenant_a)
+
+        response = client.get(
+            f"/v1/embed?k={full}",
+            HTTP_REFERER="https://app.acme.io/x",
+            HTTP_HOST="attacker.example",
+        )
+        assert directives(response)["connect-src"] == "https://api.example"
+
+    def test_production_without_a_configured_origin_connects_nowhere(
+        self, tenant_a, publishable_key_for, allowed_origin, client, settings
+    ):
+        settings.DEBUG = False
+        settings.DISPUTESHIELD = {**settings.DISPUTESHIELD, "API_ORIGIN": None}
+        allowed_origin(tenant_a)
+        full, _ = publishable_key_for(tenant_a)
+
+        response = embed(client, full, "https://app.acme.io/x")
+        assert directives(response)["connect-src"] == "'none'"
