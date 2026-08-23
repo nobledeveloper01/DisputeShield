@@ -15,6 +15,7 @@ import hashlib
 import json
 
 from rest_framework import status
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 
 from disputeshield.models import IdempotencyRecord
@@ -72,6 +73,18 @@ class IdempotentCreateMixin:
             endpoint=endpoint,
             request_fingerprint=digest,
             response_status=response.status_code,
-            response_body=response.data,
+            # Stored as *rendered* JSON, not as the serializer's Python objects.
+            # A replay has to return what the client actually received, and
+            # `response.data` can hold datetimes and Decimals that a JSONField
+            # cannot store — which fails at write time, on the original request,
+            # for a feature that only exists to make retries safe.
+            response_body=_renderable(response.data),
         )
         return response
+
+
+def _renderable(data):
+    """Round-trip through DRF's renderer so what is stored is what was sent."""
+    if data is None:
+        return {}
+    return json.loads(JSONRenderer().render(data))

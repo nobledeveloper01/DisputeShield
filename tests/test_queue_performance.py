@@ -128,6 +128,38 @@ class TestQueueAtLoad:
             f"the queue's default sort plans a sequential scan at {CASES} rows:\n{plan}"
         )
 
+    def test_the_queue_does_not_compute_business_time_per_row(self, a_full_queue, client_for):
+        """The regression this budget caught.
+
+        Computing business-time remaining needs the calendar, the pause intervals
+        and a deadline row *per case*. Fifty of those per page put the queue over
+        budget — and it passed in isolation while failing in a full run, which is
+        the worst way for a performance defect to behave.
+        """
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        client = client_for(a_full_queue)
+        client.get("/v1/disputes/")  # warm
+
+        with CaptureQueriesContext(connection) as captured:
+            client.get("/v1/disputes/?limit=50")
+
+        # One page of fifty cases must not cost a query per case.
+        assert len(captured) < 15, (
+            f"{len(captured)} queries for one page of 50 — the queue is doing "
+            "per-row work that the denormalised columns exist to avoid"
+        )
+
+    def test_the_detail_view_still_reports_business_time_remaining(
+        self, tenant_a, make_dispute, client_for
+    ):
+        """The computation moves to where it is one case rather than fifty."""
+        dispute = make_dispute(tenant_a)
+        body = client_for(tenant_a).get(f"/v1/disputes/{dispute.pk}/").json()
+        assert "remaining_seconds" in body["sla"]
+        assert body["sla"]["remaining_seconds"] > 0
+
     def test_a_filtered_queue_is_also_within_budget(self, a_full_queue, client_for):
         client = client_for(a_full_queue)
         samples = []

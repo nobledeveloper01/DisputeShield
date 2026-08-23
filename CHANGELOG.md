@@ -53,6 +53,19 @@ and released from one tag.
   said the lookup could not be tenant-scoped; the migration contradicted it. The
   policy is now split by command: SELECT unscoped (the row holds a prefix and an
   Argon2id hash), writes still tenant-scoped.
+- **The queue serializer computed business-time remaining per row.** That walk
+  needs the calendar, the pause intervals and a deadline row for every case, so a
+  page of fifty cost fifty calendar walks plus an N+1. It passed in isolation and
+  failed in a full run — the worst way for a performance defect to behave. The
+  list now reports the denormalised deadline and breach flags, which is what the
+  urgency sort and the breach pinning actually read; business-time remaining moved
+  to the detail view, where it is one case rather than fifty. The whole suite went
+  from 169s to 37s as a side effect.
+- **Idempotency records could not store their own response.** The SLA block began
+  returning datetimes, which a `JSONField` cannot hold — so the write failed on
+  the *original* request, for a feature that exists only to make retries safe.
+  Responses are now stored as rendered JSON, which is also the only way a replay
+  can return what the client actually received.
 - **The queue performance gate was measuring one row.** The load fixture reused
   the seed case's clock, which is a OneToOne, so every bulk insert violated the
   constraint and `ignore_conflicts=True` swallowed all 9,999 of them. The fixture

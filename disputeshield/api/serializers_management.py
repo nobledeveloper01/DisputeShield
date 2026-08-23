@@ -76,16 +76,26 @@ class ManagementDisputeSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_sla(self, dispute: Dispute) -> dict:
-        from disputeshield.sla import clock as clock_service
+        """The queue's SLA block, from denormalised columns only.
 
-        remaining = clock_service.remaining_seconds(dispute.clock)
+        Deliberately does **not** compute business time remaining. That walk needs
+        the calendar, the pause intervals and a deadline row per case, and doing it
+        fifty times per page put the queue over its 300 ms p95 at the §11.9 load
+        target — which is precisely what the denormalised `resolution_deadline`
+        and `breach_*` columns exist to avoid.
+
+        The two things DESIGN.md calls load-bearing — the urgency order and the
+        breach pinning — come from these columns, so the queue loses nothing.
+        Business-time remaining is computed on the detail view, where it is one
+        case rather than fifty.
+        """
         return {
             "state": dispute.clock.state,
-            "remaining_seconds": remaining,
+            "resolution_deadline": dispute.resolution_deadline,
+            "ack_deadline": dispute.ack_deadline,
             # Breached reads as its own state, never as a negative number. A minus
             # sign is something a tired reader misses (DESIGN.md).
-            "breached": remaining < 0 or dispute.breach_resolution,
-            "paused_intervals": len(dispute.clock.paused_intervals),
+            "breached": dispute.breach_resolution or dispute.breach_ack,
         }
 
 
@@ -95,6 +105,17 @@ class DisputeDetailSerializer(ManagementDisputeSerializer):
 
     class Meta(ManagementDisputeSerializer.Meta):
         fields = (*ManagementDisputeSerializer.Meta.fields, "messages", "sla_events")
+
+    def get_sla(self, dispute: Dispute) -> dict:
+        """The detail view adds what the queue cannot afford per row."""
+        from disputeshield.sla import clock as clock_service
+
+        block = super().get_sla(dispute)
+        return {
+            **block,
+            "remaining_seconds": clock_service.remaining_seconds(dispute.clock),
+            "paused_intervals": len(dispute.clock.paused_intervals),
+        }
 
     def get_sla_events(self, dispute: Dispute) -> list[dict]:
         return SLAEventSerializer(dispute.clock.events.all(), many=True).data
