@@ -1,0 +1,139 @@
+openapi: 3.1.0
+
+info:
+  title: DisputeShield API
+  version: 0.1.0
+  description: |
+    Embeddable dispute and SLA management for fintechs.
+
+    Three surfaces, three authentication schemes, deliberately not interchangeable:
+
+      * **Server API** — your backend, secret key. Mints session tokens.
+      * **Widget API** — the browser, session token. Scoped to exactly one customer.
+      * **Management API** — your agents, dashboard session or agent-scoped key.
+
+    Cross-boundary access returns **404, never 403**: a 403 confirms that the
+    resource exists, which is an information leak (§8.1).
+
+    Endpoints are added per phase. See docs/ROADMAP.md.
+  license:
+    name: BUSL-1.1
+    url: https://github.com/nobledeveloper01/DisputeShield/blob/main/LICENSE
+
+servers:
+  - url: https://api.disputeshield.dev
+    description: Hosted
+  - url: http://localhost:8000
+    description: Local
+
+security:
+  - secretKey: []
+
+components:
+  securitySchemes:
+    secretKey:
+      type: http
+      scheme: bearer
+      description: |
+        `ds_{env}_{random32}`. Server-side only. Argon2id-hashed at rest; shown
+        once at creation and never retrievable. Scoped to one environment and one
+        tenant — no key spans tenants.
+    sessionToken:
+      type: http
+      scheme: bearer
+      description: |
+        `dst_...`. Minted by your backend via POST /v1/sessions, scoped to exactly
+        one customer_ref, 30-minute TTL, revocable (ADR-0002). The publishable key
+        cannot substitute for this on any data endpoint.
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [type, message]
+          properties:
+            type: { type: string, example: not_found }
+            message: { type: string }
+            request_id: { type: string }
+
+    Transaction:
+      type: object
+      required: [reference, occurred_at]
+      properties:
+        reference: { type: string, maxLength: 128 }
+        amount_minor:
+          type: integer
+          format: int64
+          description: Integer minor units. Never a float — money is not a float.
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        occurred_at: { type: string, format: date-time }
+        description: { type: string }
+        status: { type: string }
+
+    SessionRequest:
+      type: object
+      required: [customer_ref]
+      properties:
+        customer_ref:
+          type: string
+          description: |
+            Your identifier for this customer. Stored only as a per-tenant salted
+            hash (§8.4). The session's entire visibility scope is decided here, on
+            your backend, where identity is actually known.
+        display_name: { type: string, maxLength: 128 }
+        transactions:
+          type: array
+          items: { $ref: '#/components/schemas/Transaction' }
+          description: |
+            Supplied by you at mint time. DisputeShield never queries your
+            database and holds no standing access to it.
+        ttl_seconds: { type: integer, default: 1800, maximum: 3600 }
+
+    SessionResponse:
+      type: object
+      properties:
+        session_token: { type: string, example: dst_9f2a7c... }
+        expires_at: { type: string, format: date-time }
+
+paths:
+  /v1/sessions:
+    post:
+      summary: Mint a customer-scoped session token
+      operationId: createSession
+      security: [{ secretKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SessionRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionResponse' }
+        '401':
+          description: Missing, malformed or revoked secret key
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /healthz:
+    get:
+      summary: Liveness
+      operationId: healthz
+      security: []
+      responses:
+        '200': { description: Alive }
+
+  /readyz:
+    get:
+      summary: Readiness — database, both Redis instances, audit trigger present
+      operationId: readyz
+      security: []
+      responses:
+        '200': { description: Ready }
+        '503': { description: A dependency is unavailable or the audit trigger is missing }
