@@ -46,6 +46,27 @@ rows, which is the correct failure mode.
 directly. Against Postgres directly this class of bug cannot be reproduced, which is precisely why it
 survives review elsewhere.
 
+## Amendment, phase 1 — `SET LOCAL` is scoped to the transaction, not to the block
+
+Implementing this surfaced a second edge that the original decision did not
+cover. `SET LOCAL` lasts until the transaction ends, so a helper that sets the
+variable and returns leaves the scope in place for everything that follows it in
+the same transaction.
+
+In a request that is invisible, because a request is one transaction with one
+tenant. It is not invisible anywhere a single transaction touches more than one
+tenant: a sweep over every tenant, a batched audit append, a test. The last
+tenant's scope silently becomes the scope for the remainder of the transaction —
+a cross-tenant read with no incorrect code anywhere in the traversal.
+
+`disputeshield.tenancy.middleware.db_tenant_context` is therefore a context
+manager that **restores the previous value** rather than clearing it. Restoring
+rather than clearing matters too: clearing would deny the outer scope that a
+nested call was running inside, turning a correct sweep into zero rows.
+
+Every path that establishes tenant scope now goes through it —
+`audit.append`, `audit.verify_tenant`, the middleware and the test fixtures.
+
 ## Consequences
 
 - Every request holds a transaction for its full duration. Long-running exports must be chunked so

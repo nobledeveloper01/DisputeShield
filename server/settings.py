@@ -63,6 +63,7 @@ TEMPLATES = [
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
+                "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ]
@@ -129,13 +130,15 @@ SESSION_COOKIE_HTTPONLY = True
 X_FRAME_OPTIONS = "DENY"
 
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-     "OPTIONS": {"min_length": 12}},
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 12},
+    },
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
 ]
 
 LANGUAGE_CODE = "en"
-TIME_ZONE = "UTC"          # §4.4: all arithmetic in UTC. Calendars resolve their own zone.
+TIME_ZONE = "UTC"  # §4.4: all arithmetic in UTC. Calendars resolve their own zone.
 USE_I18N = True
 USE_TZ = True
 STATIC_URL = "static/"
@@ -144,7 +147,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "formatters": {"json": {"()": "logging.Formatter", "format": "%(levelname)s %(name)s %(message)s"}},
+    "formatters": {
+        "json": {"()": "logging.Formatter", "format": "%(levelname)s %(name)s %(message)s"}
+    },
     "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "json"}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }

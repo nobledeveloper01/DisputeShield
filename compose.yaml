@@ -1,6 +1,9 @@
 # Two Redis instances from the first commit, on purpose (§11.1): the broker holds
 # the SLA sweep's task queue, and flushing a shared cache would destroy it.
 
+# Host ports are offset so DisputeShield coexists with the sibling projects on one
+# machine. Container-internal ports are unchanged.
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -8,7 +11,7 @@ services:
       POSTGRES_USER: disputeshield_owner
       POSTGRES_PASSWORD: disputeshield
       POSTGRES_DB: disputeshield
-    ports: ["5432:5432"]
+    ports: ["55433:5432"]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./scripts/init-app-role.sql:/docker-entrypoint-initdb.d/10-app-role.sql:ro
@@ -31,7 +34,7 @@ services:
       MAX_CLIENT_CONN: "200"
       DEFAULT_POOL_SIZE: "5"
       AUTH_TYPE: scram-sha-256
-    ports: ["6432:5432"]
+    ports: ["56432:5432"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,18 +42,18 @@ services:
   redis-broker:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
-    ports: ["6379:6379"]
+    ports: ["56380:6379"]
     volumes:
       - brokerdata:/data
 
   redis-cache:
     image: redis:7-alpine
     command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
-    ports: ["6380:6379"]
+    ports: ["56381:6379"]
 
   mailpit:
     image: axllent/mailpit:latest
-    ports: ["8025:8025", "1025:1025"]
+    ports: ["8026:8025", "1026:1025"]
 
 volumes:
   pgdata:

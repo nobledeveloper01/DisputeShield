@@ -15,7 +15,7 @@ that this command fails.
 from __future__ import annotations
 
 import dataclasses
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
@@ -103,7 +103,9 @@ class Command(BaseCommand):
     def _check_row_level_security(self) -> Check:
         """§8.1 layer 3: RLS enabled, and the connecting role does not bypass it."""
         with connection.cursor() as cursor:
-            cursor.execute("SELECT rolbypassrls, rolsuper FROM pg_roles WHERE rolname = current_user")
+            cursor.execute(
+                "SELECT rolbypassrls, rolsuper FROM pg_roles WHERE rolname = current_user"
+            )
             row = cursor.fetchone()
 
         if row and (row[0] or row[1]):
@@ -119,9 +121,9 @@ class Command(BaseCommand):
         """Every deadline in the product is computed against a clock. It should be the same one."""
         with connection.cursor() as cursor:
             cursor.execute("SELECT now() AT TIME ZONE 'utc'")
-            db_now = cursor.fetchone()[0].replace(tzinfo=timezone.utc)
+            db_now = cursor.fetchone()[0].replace(tzinfo=UTC)
 
-        skew = abs((datetime.now(timezone.utc) - db_now).total_seconds())
+        skew = abs((datetime.now(UTC) - db_now).total_seconds())
         if skew > 2.0:
             return Check(
                 "clock skew",

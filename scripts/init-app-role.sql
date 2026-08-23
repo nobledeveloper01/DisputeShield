@@ -19,3 +19,11 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 -- RLS must apply to the app role. The owner bypasses it, which is why the app
 -- role exists at all.
 ALTER ROLE disputeshield SET row_security = on;
+
+-- Local development only. In production the schema is owned by a separate role
+-- and migrations run as that role, never as the application. Granting CREATE
+-- here is what lets `make migrate` and the test runner work from one connection
+-- string; a deployment that copies it has given its application role the
+-- ability to drop the table whose immutability it depends on.
+GRANT CREATE ON SCHEMA public TO disputeshield;
+ALTER ROLE disputeshield CREATEDB;

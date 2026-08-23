@@ -12,7 +12,8 @@ suite runs through one.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import contextlib
+from collections.abc import Callable, Iterator
 
 from django.db import connection
 from django.http import HttpRequest, HttpResponse
@@ -39,3 +40,33 @@ def set_tenant_context(tenant_id: str) -> None:
     """
     with connection.cursor() as cursor:
         cursor.execute("SELECT set_config(%s, %s, true)", [SESSION_VARIABLE, tenant_id])
+
+
+def current_tenant_context() -> str:
+    """Whatever tenant this transaction is currently scoped to. '' means none."""
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT current_setting(%s, true)", [SESSION_VARIABLE])
+        return cursor.fetchone()[0] or ""
+
+
+@contextlib.contextmanager
+def db_tenant_context(tenant_id: str) -> Iterator[str]:
+    """Scope the RLS variable to a block, restoring what was there before.
+
+    `SET LOCAL` is scoped to the *transaction*, not to the Python block that set
+    it. In a request that distinction is invisible, because a request is one
+    transaction. Anywhere a single transaction touches more than one tenant — a
+    sweep over every tenant, a batched audit append, a test — plain
+    `set_tenant_context` leaves the last tenant's scope in place for everything
+    that follows it.
+
+    That is a cross-tenant read with no bad code anywhere in the traversal, which
+    is why this restores rather than clears: clearing would deny the outer scope
+    that a nested call was running inside.
+    """
+    previous = current_tenant_context()
+    set_tenant_context(tenant_id)
+    try:
+        yield tenant_id
+    finally:
+        set_tenant_context(previous)

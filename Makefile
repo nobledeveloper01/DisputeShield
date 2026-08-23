@@ -27,7 +27,7 @@ down:  ## Stop and remove local infrastructure
 	docker compose down -v
 
 .PHONY: migrate
-migrate:  ## Apply migrations (runs as the owner role, not the app role)
+migrate:  ## Apply migrations
 	$(PY) manage.py migrate
 
 .PHONY: doctor

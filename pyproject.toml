@@ -59,6 +59,10 @@ packages = ["disputeshield"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Ruff formats Python code blocks inside Markdown. The specification, the ADRs
+# and the README are source documents whose examples are written for a reader,
+# not for a linter — `make fmt` must not silently rewrite them.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "S", "DJ", "C4", "RUF"]
@@ -66,6 +70,12 @@ ignore = ["S101"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S105", "S106"]
+# RUF012 wants ClassVar on mutable class attributes. Django's Meta options,
+# `constraints`, `indexes` and a Migration's `operations` are all mutable class
+# attributes by framework design, and annotating them fights the framework
+# without making anything safer.
+"*/migrations/*" = ["RUF012"]
+"disputeshield/models/*" = ["RUF012"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "server.settings"

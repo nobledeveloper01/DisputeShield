@@ -87,7 +87,9 @@ The security core. Built first, tested adversarially, never revisited under time
 
 **Exit gate**
 - Two tenants; every read endpoint that exists returns **404** — not 403 — when called across the
-  boundary. Blocking CI gate (§8.1)
+  boundary. Blocking CI gate (§8.1). *Phase 1 has no endpoints, so the model-layer half is asserted
+  here and the HTTP half lands with the routes in phase 3 — a passing assertion over an empty
+  URLconf is a green gate that checks nothing.*
 - `AuditRecord.objects.filter(...).delete()` raises. A raw `UPDATE` executed as the application role
   raises **at the database level**, asserted by a test that bypasses the ORM entirely — an
   ORM-only assertion tests Django, not the database
@@ -95,6 +97,9 @@ The security core. Built first, tested adversarially, never revisited under time
 - `disputeshield_doctor --strict` **fails** on a database where the trigger migration was reverted.
   A doctor that only passes has never been shown to work
 - A model without a tenant-scoped manager fails a metaprogramming test that walks the app registry
+- Row level security is **FORCEd**, not merely enabled, asserted against `pg_class`. Plain `ENABLE`
+  exempts the table owner, and in every self-hosted compose install the application role is the
+  owner — the layer would look installed and do nothing
 
 **Review:** `/cso` on the tenancy and audit modules. The security core gets a dedicated pass rather
 than being folded into a general review.

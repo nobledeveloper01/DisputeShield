@@ -27,7 +27,12 @@ inside the same transaction as the domain write:
 ```python
 with transaction.atomic():
     cursor.execute("SELECT pg_advisory_xact_lock(%s, %s)", (ADVISORY_NAMESPACE, tenant.lock_key))
-    head = AuditRecord.objects.filter(tenant=tenant).order_by('-id').values_list('hash', flat=True).first()
+    head = (
+        AuditRecord.objects.filter(tenant=tenant)
+        .order_by("-id")
+        .values_list("hash", flat=True)
+        .first()
+    )
     ...  # compute hash over (content, head), insert
 ```
 
@@ -48,3 +53,23 @@ that rolled back, are both impossible rather than unlikely.
 - The verifier can treat any fork as tampering without qualification, because concurrency can no
   longer produce one. A monitor that alerts on a condition with a benign cause is a monitor that gets
   ignored, and this is the one alert in §11.4 that must never be ignored.
+
+## Amendment, phase 1 — verification chains on recomputed hashes
+
+§8.3 claims that tampering anywhere invalidates every record after it. The
+obvious verifier — recompute each record's hash against its own stored
+`prev_hash` — does not deliver that claim. An attacker who edits one record's
+content without rewriting the rest of the chain breaks only that record; every
+later record still links correctly to its predecessor's *stored* hash, and the
+verifier reports a single anomaly in an otherwise healthy chain.
+
+`verify_tenant` therefore recomputes each record against the **expected**
+predecessor and carries the recomputed value forward. Once one record's content
+changes, every later record was written against a chain that no longer exists,
+so all of them fail. Hiding a single-record edit now requires rewriting the
+entire remainder of the chain — which is exactly the property the design is sold
+on, and a single altered record in a long chain is precisely the tampering most
+worth catching.
+
+Asserted in `tests/test_audit_chain.py`: the break set equals every sequence from
+the edited record to the end, not merely the edited one.
