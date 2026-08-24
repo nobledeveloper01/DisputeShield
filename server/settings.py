@@ -127,7 +127,14 @@ CACHES = {
     }
 }
 
+DISPUTESHIELD_ATTACHMENT_ROOT = os.environ.get(
+    "DISPUTESHIELD_ATTACHMENT_ROOT", str(BASE_DIR / ".private" / "attachments")
+)
+
 DISPUTESHIELD = {
+    "AV_SCANNER": os.environ.get(
+        "DISPUTESHIELD_AV_SCANNER", "disputeshield.attachments.scanning.EicarScanner"
+    ),
     "WIDGET_ORIGIN": os.environ.get("DISPUTESHIELD_WIDGET_ORIGIN"),
     "API_ORIGIN": os.environ.get("DISPUTESHIELD_API_ORIGIN"),
     "ENCRYPTION_KEY_REF": os.environ.get("DISPUTESHIELD_ENCRYPTION_KEY_REF"),

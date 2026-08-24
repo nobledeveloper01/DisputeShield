@@ -26,6 +26,7 @@ from disputeshield.api.serializers_widget import (
     WidgetMessageCreateSerializer,
     WidgetMessageSerializer,
 )
+from disputeshield.api.views_attachments import AttachmentActionsMixin, CustomerAttachmentSerializer
 from disputeshield.disputes import service
 from disputeshield.models import APIKey, Dispute, DisputeMessage, SLAPolicy, WidgetConfig
 
@@ -143,12 +144,18 @@ class WidgetConfigView(APIView):
 # -- the customer's own cases --------------------------------------------------
 
 
-class WidgetDisputeViewSet(IdempotentCreateMixin, viewsets.ReadOnlyModelViewSet):
+class WidgetDisputeViewSet(
+    AttachmentActionsMixin, IdempotentCreateMixin, viewsets.ReadOnlyModelViewSet
+):
     """Read-only plus explicit creates. No generic write route exists (§10)."""
 
     authentication_classes = [SessionTokenAuthentication]
     permission_classes = [HasSessionToken]
     serializer_class = WidgetDisputeSerializer
+    # A customer sees their own upload's name and size, and nothing else. A scan
+    # verdict naming a signature tells an uploader which malware got through.
+    attachment_serializer = CustomerAttachmentSerializer
+    uploader_type = "customer"
     pagination_class = None
     lookup_value_regex = "[A-Za-z0-9_]+"
 

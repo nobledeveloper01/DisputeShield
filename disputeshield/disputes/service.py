@@ -275,6 +275,45 @@ def add_message(
         return message
 
 
+def add_context(
+    *,
+    dispute: Dispute,
+    source: str,
+    occurred_at,
+    summary: str,
+    detail: dict,
+    actor_type: str,
+    actor_id: str = "",
+):
+    """Attach what the host application knows about the transaction (§7.3).
+
+    Pushed, never pulled. §7.1's strongest security claim is that DisputeShield
+    holds no standing access to the customer's database, and an endpoint that
+    reached back for data would quietly retire it.
+    """
+    from disputeshield.models import TransactionContext
+
+    with transaction.atomic():
+        entry = TransactionContext.objects.create(
+            tenant=dispute.tenant,
+            dispute=dispute,
+            source=source,
+            occurred_at=occurred_at,
+            summary=summary,
+            detail=detail,
+        )
+        audit.append(
+            tenant=dispute.tenant,
+            event_type="dispute.context_added",
+            subject_type="dispute",
+            subject_id=dispute.pk,
+            actor_type=actor_type,
+            actor_id=actor_id,
+            payload={"context_id": entry.pk, "source": source, "summary": summary},
+        )
+        return entry
+
+
 def assign(
     *, dispute: Dispute, agent: Agent | None, actor_type: str, actor_id: str, reason: str = ""
 ) -> Dispute:

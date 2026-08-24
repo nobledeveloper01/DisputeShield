@@ -9,6 +9,80 @@ and released from one tag.
 
 ## [Unreleased]
 
+### Added — phase 5, attachments, templates and context
+
+- Content inspection (`disputeshield/attachments/inspection.py`): a magic-byte
+  allowlist of PDF, PNG, JPEG and GIF, a 10 MB cap, and rejection of polyglots,
+  PDFs carrying JavaScript or an automatic action, and archive bombs. The
+  filename is never consulted — `statement.pdf` is a claim made by whoever
+  uploaded it.
+- Private storage with content-addressed keys that contain nothing the uploader
+  supplied, so the path is neither guessable nor a traversal surface.
+- **Nothing is retrievable until it is clean** — including by whoever uploaded
+  it. An uploader who can fetch their own file back before the scan finishes has
+  a working file-hosting endpoint on a fintech's domain, and the malware never
+  needs to reach an agent to be useful.
+- Signed, expiring download URLs. The signature covers the attachment, its
+  tenant and the expiry, so a link that leaks into a chat log goes stale and one
+  tenant's link cannot be replayed against another's.
+- Downloads are served as a fixed `application/octet-stream` with
+  `Content-Disposition: attachment`, `nosniff` and a deny-everything CSP — never
+  as their own content type.
+- A pluggable AV scanner. The default is `NullScanner`, which marks files
+  `failed` rather than `clean`: an installation that never configured a scanner
+  gets invisible attachments, not unscanned ones served to agents.
+- Response templates with a **substitution engine, not a template language**. A
+  compliance officer edits these in a dashboard, and in a real engine
+  `{{ dispute.tenant.api_keys.first.key_hash }}` renders. A fixed variable
+  allowlist, no attribute access, no filters, and an unknown name renders its
+  placeholder rather than an empty string — an empty string is how a customer
+  receives "Dear ,".
+- `POST /v1/disputes/{id}/context` (§7.3). Pushed by the host application, never
+  pulled: an endpoint that reached back for data would retire §7.1's claim that
+  DisputeShield holds no standing access to the customer's database.
+- The outbox dispatcher: at-least-once with backoff, parking after six attempts
+  rather than dropping. A breach alert that vanishes is one nobody received and
+  nobody can prove was owed.
+- `disputeshield/tenancy/platform.py` — `for_each_tenant`, the only supported way
+  to write work that spans tenants.
+
+### Fixed — during phase 5
+
+- **The SLA sweep would have fired nothing in production.** It queried across
+  tenants directly, and row level security is FORCEd — so a query with no tenant
+  context returns *zero rows*, not every row. Every test passed because the
+  fixtures held a tenant context open around their `yield`; Celery has none to
+  inherit. The heartbeat would have stayed fresh and §11.5's runbook would never
+  have triggered, because the scheduler was healthy and the queries were empty.
+  The notification dispatcher and the deadline reconciler had the same defect —
+  the reconciler would have reported a clean bill of health for a database it
+  never read. All three now iterate tenants explicitly, and
+  `tests/test_platform_scope.py` asserts the context is `None` before each test
+  begins.
+- **The attachment download could not read its own row.** Same cause, found the
+  same day: the view is unauthenticated by design, so there was no tenant context
+  for RLS. The tenant now travels in the URL *and* in the signature, so it can be
+  established from a value we signed rather than one the caller chose.
+- The queue's p95 gate now measures twice and fails only if both attempts exceed
+  the budget. A wall-clock budget on a shared machine picks up whatever else is
+  running, and a gate that cries wolf is one people re-run until it passes.
+
+### Tests — 281 Python, 19 loader, 13 browser
+
+- `test_attachment_inspection.py` — the GIF/HTML polyglot, an SVG hidden in a
+  PNG, a case-varied `<ScRiPt>`, a PDF with `/JavaScript`, a PDF with
+  `/OpenAction`, an ELF renamed `.pdf`, and a zip bomb.
+- `test_attachments.py` — the scan gate asserted for pending, infected and
+  unconfigured-scanner states; signature tampering, expiry, cross-attachment and
+  cross-tenant replay; and that a pending file is byte-identical to a missing one
+  in the response, because "not scanned yet" tells an uploader when to retry.
+- `test_templates_and_context.py` — the template context is asserted to expose
+  nothing internal, marked as a leakage gate because it protects the same
+  guarantee as the widget serializer.
+- `test_platform_scope.py` — the regression guard described above, including a
+  grep that fails any future background module querying across tenants without
+  iterating them.
+
 ### Added — phase 4, the widget and its boundary
 
 - `loader/` — **1,035 bytes gzipped**, a quarter of ADR-0001's 4 KB budget. It

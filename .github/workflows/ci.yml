@@ -141,6 +141,14 @@ jobs:
       - name: the queue stays under 300ms p95 at 10,000 open cases (§11.9)
         run: pytest tests/test_queue_performance.py -q
 
+      - name: uploads are typed by content, and nothing is served before it is clean
+        run: pytest tests/test_attachment_inspection.py tests/test_attachments.py -q
+
+      - name: background work functions with no tenant context to inherit
+        # RLS returns zero rows without one, so a sweep written as a cross-tenant
+        # query fires nothing in production while passing every other test.
+        run: pytest tests/test_platform_scope.py -q
+
       # Added in the phase that makes each one real:
       #   phase 4 — widget isolation in both directions
       #   phase 9 — no call path from any module to a payment write

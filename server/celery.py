@@ -26,6 +26,10 @@ app.autodiscover_tasks()
 app.conf.task_routes = {
     "disputeshield.sla.*": {"queue": "sla"},
     "disputeshield.notifications.*": {"queue": "notify"},
+    # Scanning is I/O-bound and can be slow. It shares the notify pool rather
+    # than the sla one, because nothing in §11.3's SLO may queue behind a virus
+    # scanner.
+    "disputeshield.attachments.*": {"queue": "notify"},
 }
 
 app.conf.beat_schedule = {
@@ -36,6 +40,10 @@ app.conf.beat_schedule = {
     "disputeshield-audit-verify": {
         "task": "disputeshield.audit.verify_chains",
         "schedule": crontab(hour=3, minute=0),
+    },
+    "disputeshield-notification-dispatch": {
+        "task": "disputeshield.notifications.dispatch",
+        "schedule": crontab(minute="*"),
     },
     "disputeshield-deadline-reconcile": {
         # ADR-0007: materialised deadlines must not drift from what

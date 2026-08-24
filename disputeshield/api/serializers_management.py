@@ -124,6 +124,45 @@ class DisputeDetailSerializer(ManagementDisputeSerializer):
 # -- write shapes --------------------------------------------------------------
 
 
+class TransactionContextSerializer(serializers.Serializer):
+    """§7.3's context push. Supplied by the host application, never fetched.
+
+    §7.1's strongest security claim is that DisputeShield holds no standing
+    access to the customer's database. A context endpoint that reached back for
+    data would quietly retire it.
+    """
+
+    source = serializers.CharField(max_length=64)
+    occurred_at = serializers.DateTimeField()
+    summary = serializers.CharField(max_length=255)
+    detail = serializers.JSONField(required=False, default=dict)
+
+
+class ResponseTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        from disputeshield.models import ResponseTemplate
+
+        model = ResponseTemplate
+        fields = ("id", "name", "category", "body", "created_at")
+        read_only_fields = ("id", "created_at")
+
+    def validate_body(self, value):
+        from disputeshield.templates_engine import validate
+
+        unknown = validate(value)
+        if unknown:
+            raise serializers.ValidationError(
+                f"Unknown variables: {', '.join(unknown)}. A template may use only the "
+                "documented set — it is a substitution, not a template language, so a "
+                "name outside the set cannot be resolved by walking the object graph."
+            )
+        return value
+
+
+class RenderTemplateSerializer(serializers.Serializer):
+    template_id = serializers.CharField(max_length=32)
+
+
 class TransitionSerializer(serializers.Serializer):
     to = serializers.ChoiceField(choices=Status.choices)
     reason = serializers.CharField(max_length=2000, required=False, allow_blank=True, default="")

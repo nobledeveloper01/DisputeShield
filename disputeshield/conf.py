@@ -37,6 +37,11 @@ DEFAULTS: dict[str, Any] = {
         "reopen_window_hours": 336,
     },
     # Refuse to serve if the audit immutability trigger is not installed (§6.2).
+    # No default scanner. An installation that has not configured one gets
+    # attachments marked `failed` — invisible to everyone — rather than unscanned
+    # files being served to agents.
+    "AV_SCANNER": None,
+    "NOTIFICATION_CHANNELS": {},
     "STRICT_IMMUTABILITY": True,
     "ADVISORY_LOCK_NAMESPACE": 8_140_1,
 }

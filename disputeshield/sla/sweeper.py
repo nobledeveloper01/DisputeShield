@@ -57,11 +57,36 @@ def idempotency_key(deadline: SLADeadline) -> str:
 
 
 def sweep(*, now: datetime | None = None, limit: int = BATCH_SIZE) -> SweepResult:
+    """Fire everything due, across every tenant.
+
+    Tenant by tenant, because row level security means a query with no tenant
+    context returns nothing at all. A sweep written as one cross-tenant query
+    passes its tests — which inherit a context from a fixture — and fires nothing
+    in production, where Celery calls it with no context to inherit. The
+    heartbeat stays fresh throughout, so §11.5's runbook never triggers.
+    """
+    from disputeshield.tenancy.platform import for_each_tenant
+
     now = now or timezone.now()
     started = timezone.now()
     fired = 0
     created = 0
 
+    for tenant_fired, tenant_created in for_each_tenant(
+        lambda _tenant_id: _sweep_one_tenant(now, limit)
+    ):
+        fired += tenant_fired
+        created += tenant_created
+
+    duration_ms = int((timezone.now() - started).total_seconds() * 1000)
+    _beat(now, duration_ms, fired)
+    return SweepResult(
+        fired=fired, notifications_created=created, duration_ms=duration_ms, swept_at=now
+    )
+
+
+def _sweep_one_tenant(now: datetime, limit: int) -> tuple[int, int]:
+    fired = created = 0
     while True:
         batch = _claim(now, limit)
         if not batch:
@@ -72,12 +97,7 @@ def sweep(*, now: datetime | None = None, limit: int = BATCH_SIZE) -> SweepResul
             fired += 1
         if len(batch) < limit:
             break
-
-    duration_ms = int((timezone.now() - started).total_seconds() * 1000)
-    _beat(now, duration_ms, fired)
-    return SweepResult(
-        fired=fired, notifications_created=created, duration_ms=duration_ms, swept_at=now
-    )
+    return fired, created
 
 
 def _claim(now: datetime, limit: int) -> list[SLADeadline]:

@@ -1,5 +1,10 @@
 from disputeshield.models.agent import Agent
 from disputeshield.models.apikey import APIKey
+from disputeshield.models.attachment import (
+    DisputeAttachment,
+    ResponseTemplate,
+    TransactionContext,
+)
 from disputeshield.models.audit import AuditRecord
 from disputeshield.models.calendars import BusinessCalendar, BusinessHoursWindow, Holiday
 from disputeshield.models.clock import (
@@ -29,11 +34,13 @@ __all__ = [
     "BusinessCalendar",
     "BusinessHoursWindow",
     "Dispute",
+    "DisputeAttachment",
     "DisputeMessage",
     "Holiday",
     "IdempotencyRecord",
     "NotificationOutbox",
     "Outcome",
+    "ResponseTemplate",
     "SLAClock",
     "SLADeadline",
     "SLAEvent",
@@ -42,6 +49,7 @@ __all__ = [
     "Status",
     "SweepHeartbeat",
     "Tenant",
+    "TransactionContext",
     "WidgetConfig",
     "hash_customer_ref",
     "validate_origin",

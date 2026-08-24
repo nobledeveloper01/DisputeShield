@@ -24,9 +24,12 @@ from disputeshield.api.serializers_management import (
     ManagementDisputeSerializer,
     ManagementMessageCreateSerializer,
     PauseSerializer,
+    RenderTemplateSerializer,
     ResolveSerializer,
+    TransactionContextSerializer,
     TransitionSerializer,
 )
+from disputeshield.api.views_attachments import AttachmentActionsMixin
 from disputeshield.disputes import service
 from disputeshield.disputes.states import IllegalTransition
 from disputeshield.models import Agent, Dispute, DisputeMessage
@@ -47,7 +50,9 @@ class ActingAgentMixin:
         self.check_permissions(request)
 
 
-class DisputeViewSet(ActingAgentMixin, IdempotentCreateMixin, viewsets.ReadOnlyModelViewSet):
+class DisputeViewSet(
+    ActingAgentMixin, AttachmentActionsMixin, IdempotentCreateMixin, viewsets.ReadOnlyModelViewSet
+):
     """Read the queue and a case; move a case through the actions below.
 
     `ReadOnlyModelViewSet` on purpose. A `ModelViewSet` would route `PUT`,
@@ -231,6 +236,69 @@ class DisputeViewSet(ActingAgentMixin, IdempotentCreateMixin, viewsets.ReadOnlyM
             return Response(ManagementMessageSerializer(message).data, status=201)
 
         return self.idempotent(request, "dispute.message", produce)
+
+    @action(detail=True, methods=["get", "post"], permission_classes=[CanWorkTheQueue])
+    def context(self, request, pk=None):
+        """§7.3. Context is pushed by the host application, never pulled."""
+        dispute = self.get_object()
+
+        if request.method == "GET":
+            return Response(
+                [
+                    {
+                        "id": entry.pk,
+                        "source": entry.source,
+                        "occurred_at": entry.occurred_at,
+                        "summary": entry.summary,
+                        "detail": entry.detail,
+                    }
+                    for entry in dispute.context_entries.all()
+                ]
+            )
+
+        payload = _validated(TransactionContextSerializer, request)
+
+        def produce():
+            entry = service.add_context(
+                dispute=dispute,
+                source=payload["source"],
+                occurred_at=payload["occurred_at"],
+                summary=payload["summary"],
+                detail=payload.get("detail") or {},
+                actor_type=_actor_type(request),
+                actor_id=_actor_id(request),
+            )
+            return Response({"id": entry.pk}, status=201)
+
+        return self.idempotent(request, "dispute.context", produce)
+
+    @action(detail=True, methods=["post"], permission_classes=[CanWorkTheQueue])
+    def render_template(self, request, pk=None):
+        """Render a template against this case, for the agent to edit and send.
+
+        Rendering never sends. The agent stays the author of whatever actually
+        goes out, which is also what makes the drafted-versus-sent difference
+        measurable later (A12).
+        """
+        from disputeshield.models import ResponseTemplate
+        from disputeshield.templates_engine import context_for, render
+
+        dispute = self.get_object()
+        payload = _validated(RenderTemplateSerializer, request)
+
+        template = ResponseTemplate.objects.filter(pk=payload["template_id"]).first()
+        if template is None:
+            return Response(
+                {"error": {"type": "not_found", "message": "No such template."}}, status=404
+            )
+
+        agent = getattr(request, "acting_agent", None)
+        rendered = render(
+            template.body, context_for(dispute, agent_name=agent.display_name if agent else "")
+        )
+        return Response(
+            {"body": rendered.body, "missing": rendered.missing, "unknown": rendered.unknown}
+        )
 
     @action(detail=True, methods=["get"], permission_classes=[CanReadOnly])
     def sla(self, request, pk=None):

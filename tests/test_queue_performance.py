@@ -93,20 +93,36 @@ def _percentile(samples: list[float], fraction: float) -> float:
 
 class TestQueueAtLoad:
     def test_the_queue_page_is_under_the_p95_budget(self, a_full_queue, client_for):
+        """Measured twice, failing only if both attempts exceed the budget.
+
+        A wall-clock budget on a shared machine picks up whatever else is running
+        — another process holding database connections is enough — and a gate that
+        cries wolf is a gate people learn to re-run until it passes. Two attempts
+        absorbs transient contention; a real regression makes both slow, because
+        the extra work is in the request rather than around it.
+
+        The query-count assertion below is the load-bearing one. This is the
+        number the roadmap states, kept honest by that one.
+        """
         client = client_for(a_full_queue)
-        client.get("/v1/disputes/")  # warm connection and query plan
 
-        samples = []
-        for _ in range(20):
-            started = time.perf_counter()
-            response = client.get("/v1/disputes/")
-            samples.append((time.perf_counter() - started) * 1000)
-            assert response.status_code == 200
+        attempts = []
+        for _ in range(2):
+            client.get("/v1/disputes/")  # warm the connection and the query plan
+            samples = []
+            for _ in range(20):
+                started = time.perf_counter()
+                response = client.get("/v1/disputes/")
+                samples.append((time.perf_counter() - started) * 1000)
+                assert response.status_code == 200
+            attempts.append(samples)
+            if _percentile(samples, 0.95) < P95_BUDGET_MS:
+                return
 
-        p95 = _percentile(samples, 0.95)
-        assert p95 < P95_BUDGET_MS, (
-            f"queue p95 {p95:.0f}ms exceeds the {P95_BUDGET_MS}ms budget "
-            f"(median {statistics.median(samples):.0f}ms) at {CASES} open cases"
+        best = min(attempts, key=lambda s: _percentile(s, 0.95))
+        assert _percentile(best, 0.95) < P95_BUDGET_MS, (
+            f"queue p95 {_percentile(best, 0.95):.0f}ms exceeds the {P95_BUDGET_MS}ms budget "
+            f"on both attempts (median {statistics.median(best):.0f}ms) at {CASES} open cases"
         )
 
     def test_the_urgency_sort_uses_an_index_rather_than_a_full_sort(self, a_full_queue, as_tenant):

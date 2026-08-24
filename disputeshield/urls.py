@@ -8,6 +8,7 @@ leakage test asserts that no field path crosses between them.
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from disputeshield.api.views_attachments import AttachmentDownloadView
 from disputeshield.api.views_embed import EmbedView
 from disputeshield.api.views_health import healthz, readyz
 from disputeshield.api.views_management import DisputeViewSet
@@ -31,6 +32,13 @@ urlpatterns = [
     path("v1/sessions", SessionView.as_view(), name="session-create"),
     path("v1/embed", EmbedView.as_view(), name="embed"),
     path("v1/widget/config", WidgetConfigView.as_view(), name="widget-config"),
+    # Signed and expiring; the signature is the authorisation, which is what lets
+    # a link be handed to a browser that will not send an API key.
+    path(
+        "v1/attachments/<str:attachment_id>",
+        AttachmentDownloadView.as_view(),
+        name="attachment-download",
+    ),
     path("v1/widget/", include(widget_router.urls)),
     path("v1/", include(router.urls)),
 ]

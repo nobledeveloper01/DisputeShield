@@ -46,36 +46,53 @@ class ReconcileResult:
 
 
 def reconcile(*, tenant_id: str | None = None) -> ReconcileResult:
-    clocks = SLAClock.objects.all_tenants().exclude(state=SLAClock.State.STOPPED)
+    """Check every open clock's materialised deadlines against the arithmetic.
+
+    Tenant by tenant — see `disputeshield/tenancy/platform.py`. A reconciler that
+    reads nothing reports a clean bill of health for a database it never looked at.
+    """
+    from disputeshield.tenancy.platform import for_each_tenant
+
     if tenant_id:
-        clocks = clocks.filter(tenant_id=tenant_id)
+        with db_tenant_context(tenant_id):
+            return _reconcile_one_tenant()
+
+    checked = 0
+    mismatches: list[Mismatch] = []
+    for result in for_each_tenant(lambda _tenant_id: _reconcile_one_tenant()):
+        checked += result.checked
+        mismatches.extend(result.mismatches)
+    return ReconcileResult(checked=checked, mismatches=tuple(mismatches))
+
+
+def _reconcile_one_tenant() -> ReconcileResult:
+    clocks = SLAClock.objects.all_tenants().exclude(state=SLAClock.State.STOPPED)
 
     checked = 0
     mismatches: list[Mismatch] = []
 
     for clock in clocks.select_related("policy_version", "policy_version__calendar").iterator():
-        with db_tenant_context(clock.tenant_id):
-            calendar = calendar_for(clock)
-            pauses = paused_intervals_of(clock)  # evaluated as of now, matching the sweep
-            version = clock.policy_version
-            resolution = timedelta(hours=version.resolution_hours)
+        calendar = calendar_for(clock)
+        pauses = paused_intervals_of(clock)  # evaluated as of now, matching the sweep
+        version = clock.policy_version
+        resolution = timedelta(hours=version.resolution_hours)
 
-            for deadline in clock.deadlines.filter(fired_at__isnull=True):
-                checked += 1
-                window = _window_for(deadline, version, resolution)
-                if window is None:
-                    continue
-                recomputed = compute_deadline(clock.started_at, window, calendar, pauses)
-                if recomputed != deadline.fires_at:
-                    mismatches.append(
-                        Mismatch(
-                            clock_id=clock.pk,
-                            kind=deadline.kind,
-                            threshold_percent=deadline.threshold_percent,
-                            stored=deadline.fires_at,
-                            recomputed=recomputed,
-                        )
+        for deadline in clock.deadlines.filter(fired_at__isnull=True):
+            checked += 1
+            window = _window_for(deadline, version, resolution)
+            if window is None:
+                continue
+            recomputed = compute_deadline(clock.started_at, window, calendar, pauses)
+            if recomputed != deadline.fires_at:
+                mismatches.append(
+                    Mismatch(
+                        clock_id=clock.pk,
+                        kind=deadline.kind,
+                        threshold_percent=deadline.threshold_percent,
+                        stored=deadline.fires_at,
+                        recomputed=recomputed,
                     )
+                )
 
     return ReconcileResult(checked=checked, mismatches=tuple(mismatches))
 
