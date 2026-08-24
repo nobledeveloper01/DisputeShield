@@ -890,7 +890,12 @@ paths:
           - agent
       responses:
         '200':
-          description: Summary, rows and breach causes.
+          description: 'Summary, rows and breach causes. `summary.currencies` lists the currencies
+            the period''s cases are denominated in: `recorded_refund_minor` and
+            `disputed_amount_minor` are sums of minor units with nothing checking they are the same
+            unit, so a period spanning two currencies produces a figure that adds kobo to cents. The
+            figure is still reported — narrowing it would hide cases from a regulatory count — but a
+            client with more than one entry here must not present it as a single amount.'
   /v1/reports/regulatory:
     get:
       summary: The regulator-ready export

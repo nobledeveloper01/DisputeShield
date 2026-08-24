@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import Analysis from './analysis/Analysis.jsx';
 import Case from './case/Case.jsx';
 import Queue from './queue/Queue.jsx';
 import Recipients from './reports/Recipients.jsx';
@@ -25,6 +26,13 @@ export default function App({ client }) {
         </a>
         <a
           className="ds-link"
+          href="#/analysis"
+          aria-current={route.name === 'analysis' ? 'page' : undefined}
+        >
+          Breach analysis
+        </a>
+        <a
+          className="ds-link"
           href="#/reports"
           aria-current={route.name === 'reports' ? 'page' : undefined}
         >
@@ -34,6 +42,7 @@ export default function App({ client }) {
 
       {route.name === 'queue' ? <QueueScreen client={client} /> : null}
       {route.name === 'case' ? <CaseScreen client={client} id={route.id} /> : null}
+      {route.name === 'analysis' ? <AnalysisScreen client={client} /> : null}
       {route.name === 'reports' ? <ReportsScreen client={client} /> : null}
     </>
   );
@@ -154,6 +163,56 @@ function Failed({ message }) {
  * partially-rendered list of schedules invites a decision made on half the
  * picture.
  */
+function AnalysisScreen({ client }) {
+  const [data, setData] = useState(null);
+  const [groupBy, setGroupBy] = useState('category');
+  const [period, setPeriod] = useState(() => defaultPeriod());
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    client
+      .slaPerformance({ from: period.from, to: period.to, group_by: groupBy })
+      .then((result) => !cancelled && setData(result))
+      .catch((problem) => !cancelled && setError(problem.message));
+    return () => {
+      cancelled = true;
+    };
+  }, [client, period, groupBy]);
+
+  if (error) return <Failed message={error} />;
+  if (data === null) return <Loading />;
+
+  return (
+    <main className="ds-app ds-app-wide">
+      <Analysis
+        data={data}
+        period={period}
+        groupBy={groupBy}
+        onPeriod={setPeriod}
+        onGroupBy={setGroupBy}
+      />
+    </main>
+  );
+}
+
+/**
+ * The last complete calendar month, not "the last 30 days".
+ *
+ * A regulatory conversation is about periods a supervisor recognises, and a
+ * rolling window means the same question asked twice a day apart gets two
+ * different answers with no way to tell which was quoted.
+ */
+function defaultPeriod(now = new Date()) {
+  const firstOfThis = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const firstOfLast = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  return { from: iso(firstOfLast), to: iso(firstOfThis) };
+}
+
+function iso(date) {
+  return date.toISOString().slice(0, 10);
+}
+
 function ReportsScreen({ client }) {
   const [recipients, setRecipients] = useState(null);
   const [schedules, setSchedules] = useState(null);

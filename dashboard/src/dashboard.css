@@ -54,12 +54,15 @@ body {
 /* Instrument Serif at 24px and above only — below that it loses both its
    argument and its legibility. */
 .ds-h1 { font: 400 32px/1.2 var(--ds-display); margin: 0; }
-.ds-h2 { font: 400 24px/1.2 var(--ds-display); margin: 0 0 var(--ds-space); }
+.ds-h2 { font: 400 24px/1.2 var(--ds-display); margin: calc(var(--ds-space) * 4) 0 var(--ds-space); }
+.ds-app > * > .ds-h2:first-of-type, .ds-case-main .ds-h2 { margin-top: calc(var(--ds-space) * 3); }
+.ds-queue-head .ds-h2 { margin-top: 0; }
 .ds-h3 { font: 600 14px/1.4 var(--ds-ui); margin: 0 0 4px; }
 
 .ds-lede { color: var(--ds-muted); margin: 0 0 calc(var(--ds-space) * 2); max-width: 66ch; }
 .ds-note { color: var(--ds-muted); font-size: 13px; margin: 2px 0 0; display: block; }
 .ds-help { color: var(--ds-muted); font-size: 12px; margin: 4px 0 0; max-width: 60ch; }
+span.ds-help { display: block; }
 .ds-empty { color: var(--ds-muted); padding: calc(var(--ds-space) * 2); }
 
 /* Tabular figures are non-negotiable: a column of dates or counts whose digits
@@ -369,3 +372,35 @@ body {
   .ds-case { grid-template-columns: minmax(0, 1fr); }
   .ds-case-side { position: static; }
 }
+
+/* --- breach analysis ------------------------------------------------------ */
+
+.ds-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1px;
+  margin: calc(var(--ds-space) * 2) 0 calc(var(--ds-space) * 4);
+  background: var(--ds-line);
+  border: 1px solid var(--ds-line);
+}
+.ds-summary-cell { background: var(--ds-bg); padding: calc(var(--ds-space) * 1.5); }
+.ds-summary dt { color: var(--ds-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+.ds-summary dd { margin: 4px 0 0; }
+.ds-figure { font-size: 24px; line-height: 1.1; }
+.ds-figure.ds-state-breached { color: var(--ds-breached); }
+.ds-figure.ds-state-comfortable { color: var(--ds-ink); }
+
+/* The bar carries magnitude, the figure carries the number. Not a chart series
+   chosen for variety — one ink, one signal colour, and the colour only appears
+   where a deadline was missed. */
+.ds-rate { display: flex; align-items: center; gap: var(--ds-space); min-width: 12rem; }
+.ds-rate-bar { height: 8px; flex: 0 0 auto; min-width: 1px; background: var(--ds-line); }
+.ds-rate.ds-state-breached .ds-rate-bar { background: var(--ds-breached); }
+.ds-rate.ds-state-comfortable .ds-rate-bar { background: var(--ds-line); }
+
+.ds-undocumented { margin-bottom: calc(var(--ds-space) * 2); }
+.ds-undocumented.ds-state-breached { border-color: var(--ds-breached); border-left-width: 4px; }
+
+.ds-causes { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--ds-line); border: 1px solid var(--ds-line); }
+.ds-causes li { background: var(--ds-bg); padding: var(--ds-space) calc(var(--ds-space) * 1.5); display: flex; gap: calc(var(--ds-space) * 2); }
+.ds-causes-count { min-width: 3ch; text-align: right; font-weight: 600; }

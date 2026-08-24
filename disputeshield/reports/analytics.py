@@ -145,6 +145,15 @@ def summary(*, period_from: datetime, period_to: datetime) -> dict:
             amount=Sum("amount_minor"),
         )
         resolved_count = cases.filter(resolved_at__isnull=False).count()
+        # Which currencies the sums above are made of. `Sum("refund_amount_minor")`
+        # adds minor units together without asking whether they are the same unit,
+        # so a period holding both NGN and USD cases produces a total that adds
+        # kobo to cents. The figure is still reported — narrowing it here would
+        # hide cases from a regulatory count — but a caller now has what it needs
+        # to refuse to present it as money.
+        currencies = sorted(
+            value for value in cases.values_list("currency", flat=True).distinct() if value
+        )
         deflected = (
             AuditRecord.objects.using(REPLICA)
             .filter(
@@ -180,6 +189,7 @@ def summary(*, period_from: datetime, period_to: datetime) -> dict:
         "recorded_refund_minor": aggregate["refunds"] or 0,
         "disputed_amount_minor": aggregate["amount"] or 0,
         "average_pause_seconds": average_pause,
+        "currencies": currencies,
     }
 
 

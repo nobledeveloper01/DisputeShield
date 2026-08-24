@@ -12,6 +12,7 @@ export function parse(hash) {
   const caseMatch = path.match(/^\/cases\/([A-Za-z0-9_]+)$/);
   if (caseMatch) return { name: 'case', id: caseMatch[1] };
   if (path === '/reports') return { name: 'reports' };
+  if (path === '/analysis') return { name: 'analysis' };
   return { name: 'queue' };
 }
 

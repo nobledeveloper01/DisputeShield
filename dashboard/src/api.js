@@ -45,6 +45,13 @@ export function createClient({ baseUrl }) {
     resume: (id, reason) =>
       request(`/v1/disputes/${id}/resume/`, { method: 'POST', body: { reason } }),
 
+    slaPerformance: ({ from, to, group_by }) => {
+      const query = new URLSearchParams(
+        Object.entries({ from, to, group_by }).filter(([, v]) => v)
+      );
+      return request(`/v1/analytics/sla-performance?${query.toString()}`);
+    },
+
     listRecipients: () => request('/v1/reports/recipients'),
     addRecipient: (payload) =>
       request('/v1/reports/recipients', { method: 'POST', body: payload }),

@@ -314,6 +314,43 @@ class TestBreachAnalysis:
         assert block["recorded_refund_minor"] == 5_000_000
         assert block["cases"] == 3
 
+    def test_the_summary_names_the_currencies_its_totals_are_made_of(
+        self, a_period_of_cases, as_tenant
+    ):
+        """A refund total is a sum of minor units, with nothing checking they are
+        the same unit.
+
+        A period holding both NGN and USD cases produces a figure that adds kobo
+        to cents. The figure is still reported — narrowing it would hide cases
+        from a regulatory count — but a caller needs to know when presenting it
+        as money would be a lie. The dashboard refuses to render a single total
+        on the strength of this field.
+        """
+        tenant, cases = a_period_of_cases
+
+        # Each write closes its tenant block before the read. `summary()` runs on
+        # the replica, which is a separate connection — a change still inside an
+        # uncommitted transaction here is invisible there, and the assertion would
+        # be measuring transaction visibility rather than the code.
+        with as_tenant(tenant):
+            for case in cases:
+                case.currency = "NGN"
+                case.save(update_fields=["currency"])
+        with as_tenant(tenant):
+            assert analytics.summary(period_from=PERIOD_FROM, period_to=PERIOD_TO)[
+                "currencies"
+            ] == ["NGN"]
+
+        with as_tenant(tenant):
+            cases[1].currency = "USD"
+            cases[1].save(update_fields=["currency"])
+        with as_tenant(tenant):
+            mixed = analytics.summary(period_from=PERIOD_FROM, period_to=PERIOD_TO)
+
+        assert mixed["currencies"] == ["NGN", "USD"]
+        # Still counted. Reporting fewer cases would be the worse failure.
+        assert mixed["cases"] == 3
+
     def test_the_endpoint_returns_rows_and_causes(self, a_period_of_cases, client_for):
         tenant, _ = a_period_of_cases
         body = client_for(tenant).get("/v1/analytics/sla-performance").json()

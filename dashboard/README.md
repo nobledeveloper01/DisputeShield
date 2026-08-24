@@ -16,9 +16,9 @@ Roles are Owner, Compliance, Agent and Read-only. An agent can resolve a case bu
 cannot change an SLA policy; a compliance user can change a policy, and the change
 is recorded, versioned and rendered next to the breach data it affects.
 
-**Built so far:** the queue (`src/queue/`), the case view (`src/case/`) and
-report delivery (`src/reports/`). Breach analysis, SLA policies, widget config
-and settings are still to come.
+**Built so far:** the queue (`src/queue/`), the case view (`src/case/`), breach
+analysis (`src/analysis/`) and report delivery (`src/reports/`). SLA policies,
+widget config and settings are still to come.
 
 ## Running it
 
@@ -54,6 +54,26 @@ the other — and in the dangerous direction, because an agent triages from the
 queue. So the clock is time-until-deadline everywhere, and the case additionally
 shows business time under its own explicit label. Two figures with two labels is
 honest; one label over two quantities is not.
+
+## Breach analysis
+
+Two things on that screen are placement decisions rather than layout, and both
+come from reasoning already in the backend:
+
+- **Deflections sit beside case volume**, never in their own panel. A feature
+  that reduces recorded complaints has to be the most heavily instrumented thing
+  in the product — a fall during an outage must be visibly a deflection rather
+  than silently a suppression, and two numbers in two panels are two numbers
+  nobody puts together.
+- **Undocumented causes are separated from the ranked ones.** §11.5 requires
+  every breach in an incident window to be annotated with its systems cause.
+  Sorting causes by frequency buries "we don't know" behind whichever incident
+  happened to be biggest.
+
+There are deliberately **no breach-rate bands**. A green/amber/red scale at, say,
+5% and 10% would be read as authoritative by the person least able to check it.
+Any breach at all is a missed deadline, which is what earns colour; the bar
+length carries the magnitude.
 
 ## Where the derived state comes from
 

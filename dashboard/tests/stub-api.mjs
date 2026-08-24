@@ -233,6 +233,48 @@ export async function stubQueue(page, now = Date.now()) {
   await page.route('**/v1/disputes/*/', (route) => route.fulfill({ json: caseDetail(now) }));
 }
 
+export const ANALYSIS = {
+  group_by: 'category',
+  summary: {
+    cases: 412,
+    breached: 27,
+    resolved: 385,
+    deflected: 96,
+    recorded_refund_minor: 1_845_000_00,
+    disputed_amount_minor: 9_120_000_00,
+    average_pause_seconds: 9000,
+    currencies: ['NGN']
+  },
+  rows: [
+    // Deliberately not pre-sorted: the view sorts worst-first, and a fixture
+    // that arrives sorted cannot tell whether it did.
+    { key: 'failed_airtime', cases: 120, breached: 0, breach_rate: 0, total_pause_seconds: 0 },
+    { key: 'failed_transfer', cases: 180, breached: 21, breach_rate: 0.1167, total_pause_seconds: 262800 },
+    { key: 'duplicate_charge', cases: 112, breached: 6, breach_rate: 0.0536, total_pause_seconds: 5400 }
+  ],
+  causes: [
+    { cause: 'Scheme response window exceeded; INC-2026-0412', cases: 14 },
+    { cause: 'undocumented', cases: 9 },
+    { cause: 'Beat scheduler stalled; INC-2026-0823', cases: 4 }
+  ]
+};
+
+export const ANALYSIS_CLEAN = {
+  ...ANALYSIS,
+  summary: { ...ANALYSIS.summary, breached: 0 },
+  rows: ANALYSIS.rows.map((row) => ({ ...row, breached: 0, breach_rate: 0 })),
+  causes: [{ cause: 'Scheme response window exceeded; INC-2026-0412', cases: 2 }]
+};
+
+export const ANALYSIS_MIXED = {
+  ...ANALYSIS,
+  summary: { ...ANALYSIS.summary, currencies: ['NGN', 'USD'] }
+};
+
+export async function stubAnalysis(page, payload = ANALYSIS) {
+  await page.route('**/v1/analytics/sla-performance*', (route) => route.fulfill({ json: payload }));
+}
+
 export async function stubApi(page) {
   await page.route('**/v1/reports/recipients', (route) =>
     route.request().method() === 'GET'

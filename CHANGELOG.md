@@ -11,6 +11,30 @@ and released from one tag.
 
 ### Added
 
+- **The breach analysis view** (`dashboard/src/analysis/`), the screen a
+  compliance officer answers a supervisor from.
+- **Deflections render beside case volume**, never in their own panel. A feature
+  that reduces recorded complaints has to be the most heavily instrumented thing
+  in the product: a fall during an outage must be visibly a deflection rather
+  than silently a suppression, and two numbers in two panels are two numbers
+  nobody puts together.
+- **Undocumented breach causes are separated from the ranked ones**, not sorted
+  among them. §11.5 requires every breach in an incident window to be annotated
+  with its systems cause; a documented cause is defensible, an undocumented one
+  is "we do not know" said to a regulator. Ranking by frequency buries that
+  behind whichever incident happened to be biggest. The share is quoted as a rate
+  as well as a count — a count alone does not say whether it is a rounding error
+  or a third of the period.
+- **No breach-rate bands.** The obvious design puts a green/amber/red scale at 5%
+  and 10%. Nothing in the regulation or the specification says those numbers, and
+  a threshold invented in the dashboard would be read as authoritative by the
+  person least able to check it. Any breach at all is a missed deadline — that is
+  what earns colour — and the bar length carries the magnitude. A group with no
+  breaches is monochrome.
+- The default period is **the last complete calendar month**, not a rolling
+  window: a supervisor's question is about a period they recognise, and a rolling
+  window means the same question asked a day apart gets two different answers
+  with no way to tell which was quoted.
 - **The queue and the case view** (`dashboard/src/queue/`, `dashboard/src/case/`),
   the two screens an agent actually works in.
 - **One clock component, shared by both** (`src/clock.js`), holding DESIGN.md's
@@ -207,6 +231,19 @@ and released from one tag.
 
 ### Fixed
 
+- **A refund total could be quoted across two currencies.** `summary()` sums
+  `refund_amount_minor` with nothing checking the values are the same unit, so a
+  period holding both NGN and USD cases produced a figure that adds kobo to
+  cents — and rendered with a currency symbol in front of it, that figure gets
+  quoted to a regulator. The summary now reports the `currencies` its totals are
+  made of; the figure is still returned, because narrowing it would hide cases
+  from a regulatory count, and the dashboard refuses to present a single amount
+  when there is more than one.
+- **A `<dl>` with `<p>` inside its `<div>` wrappers** made the summary list
+  unparseable to a screen reader — caught by axe, fixed by moving the help text
+  inside the `<dd>`. A `role="group" aria-label="Group by"` around a single
+  control also shadowed the select of the same name; a group of one is not a
+  group.
 - **The internal-note alignment signal was doing nothing.** `margin-left: auto`
   on a stretched grid item resolves to `0px`, so internal notes were never
   offset — one of the four signals that stop an agent mistaking a note for a
