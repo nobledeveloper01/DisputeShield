@@ -11,7 +11,7 @@ import { stubApi } from './stub-api.mjs';
  */
 test.beforeEach(async ({ page }) => {
   await stubApi(page);
-  await page.goto('/');
+  await page.goto('/#/reports');
   await expect(page.getByRole('heading', { name: 'Report delivery' })).toBeVisible();
 });
 

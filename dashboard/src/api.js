@@ -30,6 +30,21 @@ export function createClient({ baseUrl }) {
   }
 
   return {
+    listQueue: (filters = {}) => {
+      const query = new URLSearchParams(
+        Object.entries(filters).filter(([, value]) => value !== '' && value !== undefined)
+      );
+      const suffix = query.toString();
+      return request(`/v1/disputes/${suffix ? `?${suffix}` : ''}`);
+    },
+    getCase: (id) => request(`/v1/disputes/${id}/`),
+    getContext: (id) => request(`/v1/disputes/${id}/context/`),
+    addMessage: (id, body, visibility) =>
+      request(`/v1/disputes/${id}/messages/`, { method: 'POST', body: { body, visibility } }),
+    pause: (id, reason) => request(`/v1/disputes/${id}/pause/`, { method: 'POST', body: { reason } }),
+    resume: (id, reason) =>
+      request(`/v1/disputes/${id}/resume/`, { method: 'POST', body: { reason } }),
+
     listRecipients: () => request('/v1/reports/recipients'),
     addRecipient: (payload) =>
       request('/v1/reports/recipients', { method: 'POST', body: payload }),

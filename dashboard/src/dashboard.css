@@ -219,3 +219,153 @@ body {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* --- navigation, monochrome ---------------------------------------------- */
+
+.ds-nav {
+  display: flex;
+  gap: calc(var(--ds-space) * 3);
+  padding: var(--ds-space) calc(var(--ds-space) * 3);
+  border-bottom: 1px solid var(--ds-line);
+}
+.ds-link { color: var(--ds-ink); text-decoration: underline; text-underline-offset: 3px; }
+.ds-nav .ds-link[aria-current='page'] { text-decoration-thickness: 2px; font-weight: 600; }
+.ds-app-wide { max-width: 1400px; }
+
+/* --- the queue ------------------------------------------------------------ */
+
+.ds-queue-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(var(--ds-space) * 2);
+  flex-wrap: wrap;
+}
+.ds-filters { display: flex; align-items: center; gap: calc(var(--ds-space) * 2); }
+
+.ds-queue { width: 100%; border-collapse: collapse; margin-top: calc(var(--ds-space) * 2); }
+.ds-queue th {
+  text-align: left;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ds-muted);
+  font-weight: 600;
+  padding: var(--ds-space);
+  border-bottom: 1px solid var(--ds-line);
+}
+/* 44px rows: dense enough to see twenty cases without scrolling, tall enough to
+   hit on a laptop trackpad. Achieved with padding rather than a cell height —
+   see the note on the recipients table for why a `height` on a `<td>` is a trap. */
+.ds-queue-row td {
+  padding: 12px var(--ds-space);
+  border-bottom: 1px solid var(--ds-line);
+  vertical-align: middle;
+}
+.ds-right { text-align: right; }
+.ds-queue-clock { width: 15ch; }
+
+/* --- the clock ------------------------------------------------------------ */
+
+.ds-clock { font-variant-numeric: tabular-nums; white-space: nowrap; display: inline-block; }
+.ds-clock-label { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+.ds-clock-large { font-size: 28px; display: block; margin: 4px 0 var(--ds-space); }
+.ds-clock-large .ds-clock-label { display: block; font-size: 12px; }
+
+/* Breached: solid fill, the highest contrast available. */
+.ds-clock.ds-state-breached {
+  background: var(--ds-breached);
+  color: var(--ds-breached-ink);
+  padding: 2px 6px;
+}
+/* Critical: saturated, and the only thing on screen allowed to move. */
+.ds-clock.ds-state-critical { color: var(--ds-breached); font-weight: 600; animation: ds-pulse 1.6s ease-in-out infinite; }
+/* Warning: saturated, static. */
+.ds-clock.ds-state-warning { color: var(--ds-warning); font-weight: 600; }
+/* Notice: a muted tint. */
+.ds-clock.ds-state-notice { background: var(--ds-notice); padding: 2px 6px; }
+/* Comfortable: no colour at all. */
+.ds-clock.ds-state-comfortable { color: var(--ds-ink); }
+/* Paused: desaturated with a visible hatch, so it can never read as comfortable. */
+.ds-clock.ds-state-paused {
+  color: var(--ds-muted);
+  padding: 2px 6px;
+  background-image: repeating-linear-gradient(
+    45deg, transparent, transparent 4px, var(--ds-raised) 4px, var(--ds-raised) 8px
+  );
+}
+.ds-clock.ds-state-none { color: var(--ds-muted); }
+
+@keyframes ds-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+/* The signal survives; only the movement goes. */
+@media (prefers-reduced-motion: reduce) {
+  .ds-clock.ds-state-critical { animation: none; }
+}
+
+/* --- the case view -------------------------------------------------------- */
+
+.ds-case {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: calc(var(--ds-space) * 4);
+  align-items: start;
+}
+.ds-case-main { min-width: 0; }
+.ds-back { display: inline-block; margin-bottom: var(--ds-space); }
+
+/* The clock never scrolls out of view. The whole point of it is that it is
+   always true, and one an agent last saw four screens ago is not. */
+.ds-case-side { position: sticky; top: var(--ds-space); display: grid; gap: calc(var(--ds-space) * 2); }
+.ds-panel { border: 1px solid var(--ds-line); padding: calc(var(--ds-space) * 1.5); }
+.ds-panel .ds-h3 { margin-bottom: var(--ds-space); }
+/* Separated from the figures above it: pausing is an action, not another fact. */
+.ds-panel .ds-field {
+  margin-top: calc(var(--ds-space) * 1.5);
+  padding-top: calc(var(--ds-space) * 1.5);
+  border-top: 1px solid var(--ds-line);
+}
+
+.ds-facts { display: grid; grid-template-columns: auto 1fr; gap: 4px var(--ds-space); margin: 0; }
+.ds-facts dt { color: var(--ds-muted); font-size: 13px; }
+.ds-facts dd { margin: 0; }
+
+.ds-timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ds-space); }
+.ds-timeline li { border-left: 2px solid var(--ds-line); padding-left: var(--ds-space); }
+.ds-timeline p { margin: 0; }
+.ds-timeline-when { font-size: 12px; color: var(--ds-muted); }
+
+/* --- conversation: an internal note must be unmistakable ------------------ */
+
+.ds-conversation { list-style: none; margin: 0 0 calc(var(--ds-space) * 3); padding: 0; display: grid; gap: calc(var(--ds-space) * 1.5); }
+.ds-message { padding: calc(var(--ds-space) * 1.5); border: 1px solid var(--ds-line); max-width: 46rem; }
+.ds-message-meta { display: flex; justify-content: space-between; gap: var(--ds-space); margin: 0 0 4px; flex-wrap: wrap; }
+.ds-message-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.ds-message-body { margin: 0; white-space: pre-wrap; }
+
+/* Four signals, because any one alone fails somebody: background, alignment, a
+   persistent label and a distinct composer. The label is the one that always
+   works — it survives a screen reader, a narrow viewport and a monochrome
+   display. None of this is colour: an internal note is not a deadline. */
+/* `justify-self`, not `margin: auto`. These are grid items, and an auto margin
+   on a stretched grid item resolves to 0 — the alignment signal was silently
+   doing nothing, which is the failure mode this whole area is about. */
+.ds-message-customer { background: var(--ds-bg); justify-self: start; }
+.ds-message-internal {
+  background: var(--ds-raised);
+  justify-self: end;
+  border-style: dashed;
+  border-width: 2px;
+}
+
+.ds-composer { display: grid; gap: 4px; max-width: 46rem; padding: calc(var(--ds-space) * 1.5); border: 1px solid var(--ds-line); margin-bottom: calc(var(--ds-space) * 2); }
+.ds-composer-internal { background: var(--ds-raised); border-style: dashed; border-width: 2px; }
+.ds-composer button { justify-self: start; margin-top: var(--ds-space); }
+.ds-textarea { font: inherit; resize: vertical; }
+
+@media (max-width: 900px) {
+  .ds-case { grid-template-columns: minmax(0, 1fr); }
+  .ds-case-side { position: static; }
+}

@@ -16,9 +16,9 @@ Roles are Owner, Compliance, Agent and Read-only. An agent can resolve a case bu
 cannot change an SLA policy; a compliance user can change a policy, and the change
 is recorded, versioned and rendered next to the breach data it affects.
 
-**Built so far:** report delivery — the recipient allowlist and the monthly
-schedules (`src/reports/`). Queue, case view and breach analysis are still to
-come.
+**Built so far:** the queue (`src/queue/`), the case view (`src/case/`) and
+report delivery (`src/reports/`). Breach analysis, SLA policies, widget config
+and settings are still to come.
 
 ## Running it
 
@@ -33,6 +33,27 @@ keyboard-only compliance officer can operate the surface and that it has no WCAG
 AA violations; neither needs a database, and a suite slow enough to skip is an
 accessibility gate that has stopped being one. The API contract underneath is
 covered by the Python suite, through real authentication, roles and RLS.
+
+## The clock
+
+`src/clock.js` holds the rules DESIGN.md sets out — precision decreasing with
+distance, `BREACHED · 2h 14m ago` rather than a minus sign, paused reading as
+paused first, thresholds as percentages of the window. They are pure functions,
+tested without a browser, and every surface renders what they return, so the
+clock cannot read one way in the queue and another on the case.
+
+**Which quantity it shows.** The server computes two different things:
+`resolution_deadline` is the instant a case is due, already calculated using the
+tenant's business hours; `sla.remaining_seconds` is *business* time left, and the
+queue endpoint deliberately does not compute it per row because doing so cost an
+N+1 and a calendar walk per case and put the queue over its 300ms p95.
+
+Showing time-to-deadline in the queue and business time on the case under one
+label would make the same case read "2d 16h left" in one place and "0h left" in
+the other — and in the dangerous direction, because an agent triages from the
+queue. So the clock is time-until-deadline everywhere, and the case additionally
+shows business time under its own explicit label. Two figures with two labels is
+honest; one label over two quantities is not.
 
 ## Where the derived state comes from
 

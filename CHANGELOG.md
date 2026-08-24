@@ -11,6 +11,48 @@ and released from one tag.
 
 ### Added
 
+- **The queue and the case view** (`dashboard/src/queue/`, `dashboard/src/case/`),
+  the two screens an agent actually works in.
+- **One clock component, shared by both** (`src/clock.js`), holding DESIGN.md's
+  rules as pure functions so the same case cannot read one way in the queue and
+  another on the case: precision decreasing with distance (minutes under an hour,
+  hours under a day, days beyond), `BREACHED · 2h 14m ago` rather than a minus
+  sign a tired reader misses, paused reading as paused first, and thresholds as
+  percentages of the window rather than fixed durations — so six hours left is
+  comfortable on an eight-hour window and critical on a five-day one.
+- **Which quantity the clock shows needed deciding, and the decision is
+  documented.** `resolution_deadline` is the instant a case is due; `remaining_seconds`
+  is *business* time left, which the queue endpoint deliberately does not compute
+  per row because it cost an N+1 and a calendar walk per case. Under one label the
+  same case would read "2d 16h left" in the queue and "0h left" when opened — in
+  the dangerous direction, since triage happens from the queue. The clock is
+  time-until-deadline everywhere; the case adds business time under its own
+  explicit label.
+- **The sort order is the design**, and the client does not re-sort. Rows arrive
+  in the server's urgency order, which is asserted server-side against an index;
+  re-sorting in JavaScript would replace a tested guarantee with an untested one.
+- **A healthy queue is monochrome**, asserted by reading the computed colour of a
+  comfortable row rather than by looking at it. Only the critical row moves, and
+  `prefers-reduced-motion` removes the pulse while keeping the fill, the label
+  and the position.
+- **The reference is the link, not the whole row.** A row-wide click target makes
+  selecting a case reference to paste into a regulator's email impossible.
+- **Internal notes carry four independent signals**, because any one alone fails
+  somebody: a different background (fails a screen reader), a different alignment
+  (fails at narrow widths), a persistent label (the one that always works), and a
+  separate composer. §10 stops an internal note *leaking*; this stops an agent
+  believing they wrote one thing when they wrote another.
+- **Two composers, not one with a visibility dropdown.** A single box with a
+  toggle is the design that produces the accident: the agent types, the dropdown
+  is still set from last time, and an internal note goes to a customer. Asserted
+  by checking no visibility select exists.
+- The clock is sticky on the case view — the whole point of it is that it is
+  always true, and one an agent last saw four screens ago is not.
+- Pausing requires a reason before the button is operable at all. A pausable
+  clock is an abusable clock.
+- Hash routing in twenty lines rather than a router dependency, with the case-id
+  pattern pinned to the management API's own `[A-Za-z0-9_]+` so a crafted hash
+  cannot put arbitrary text into a request path.
 - **The dashboard's first surface: report delivery** (`dashboard/`). The
   allowlist and the schedules on one screen, because splitting them would let
   somebody create a schedule without seeing that the address it points at was
@@ -165,6 +207,16 @@ and released from one tag.
 
 ### Fixed
 
+- **The internal-note alignment signal was doing nothing.** `margin-left: auto`
+  on a stretched grid item resolves to `0px`, so internal notes were never
+  offset — one of the four signals that stop an agent mistaking a note for a
+  customer message was silently absent. Now `justify-self`, and the test measures
+  the rendered position rather than the property that was supposed to produce it.
+  Asserting the property passed while the alignment did nothing at all.
+- Raw ISO timestamps and stored enum values were being shown to agents —
+  `2026-08-24T16:25:42.799Z` in a conversation and `failed_transfer` in a
+  category column. Neither is wrong; both are the storage format shown to
+  somebody who does not work in it.
 - **A `display: flex` on a `<td>` broke the recipients table's dividers.** It
   stops the element being a table cell, so it drops out of the row's height
   calculation and its bottom border draws above the rest of the line. The rule
