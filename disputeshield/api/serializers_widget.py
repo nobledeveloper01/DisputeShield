@@ -93,3 +93,48 @@ class WidgetDisputeCreateSerializer(serializers.Serializer):
 
 class WidgetMessageCreateSerializer(serializers.Serializer):
     body = serializers.CharField(max_length=10_000)
+
+
+class WebhookDisputeSerializer(serializers.ModelSerializer):
+    """The projection an outbound webhook carries (amplifier A14).
+
+    **Declared in this module deliberately.** A14 says the internal-note exclusion
+    of §10 applies identically to webhooks, and the way to guarantee that is for
+    the webhook payload to be covered by the *same* field-graph test that protects
+    the widget — not by a parallel one. A second implementation of one guarantee
+    is a second thing to get wrong, and the two would drift the first time
+    somebody added a field to only one of them.
+
+    So `tests/test_serializer_leakage.py` walks this class alongside the widget's,
+    and its module enumeration fails the build if a new serializer appears here
+    without coverage.
+    """
+
+    sla = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Dispute
+        fields = (
+            "id",
+            "reference",
+            "category",
+            "subcategory",
+            "status",
+            "transaction_ref",
+            "amount_minor",
+            "currency",
+            "submitted_at",
+            "acknowledged_at",
+            "resolved_at",
+            "outcome",
+            "sla",
+        )
+        read_only_fields = fields
+
+    def get_sla(self, dispute: Dispute) -> dict:
+        """Deadlines and breach flags. No pause reasons, no agent, no notes."""
+        return {
+            "ack_deadline": dispute.ack_deadline,
+            "resolution_deadline": dispute.resolution_deadline,
+            "breached": dispute.breach_resolution or dispute.breach_ack,
+        }

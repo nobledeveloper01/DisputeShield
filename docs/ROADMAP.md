@@ -435,6 +435,11 @@ easy ones" arrives in this phase, and the answer needs to have been decided befo
 
 **Review:** `/review`, `/devex-review` on the webhook integration experience.
 
+> **Status: complete.** The gate that earned its place: the simulator's
+> self-check found that the replica is a separate connection with no RLS context,
+> so anything reading from it returned zero rows silently. `analytics.py` had been
+> claiming replica routing since phase 6 without doing it.
+
 ---
 
 ## Phase 12 — Enterprise and adoption — **v2.0**

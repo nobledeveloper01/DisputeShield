@@ -48,6 +48,12 @@ from disputeshield.models.intelligence import (
     RootCauseCluster,
     Suggestion,
 )
+from disputeshield.models.operations import (
+    PolicySimulation,
+    QaReview,
+    WebhookDelivery,
+    WebhookEndpoint,
+)
 from disputeshield.models.policy import SLAPolicy, SLAPolicyVersion
 from disputeshield.models.returns import RegulatoryReturn, ReturnTemplate
 from disputeshield.models.scheme import ReasonCode, Representment
@@ -82,8 +88,10 @@ __all__ = [
     "MassEventMembership",
     "NotificationOutbox",
     "Outcome",
+    "PolicySimulation",
     "ProviderCall",
     "ProviderConnector",
+    "QaReview",
     "ReasonCode",
     "RegulatoryReturn",
     "Representment",
@@ -102,6 +110,8 @@ __all__ = [
     "SweepHeartbeat",
     "Tenant",
     "TransactionContext",
+    "WebhookDelivery",
+    "WebhookEndpoint",
     "WidgetConfig",
     "hash_customer_ref",
     "hash_identity",

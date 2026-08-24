@@ -18,6 +18,7 @@ from rest_framework import serializers
 
 from disputeshield.api import serializers_widget
 from disputeshield.api.serializers_widget import (
+    WebhookDisputeSerializer,
     WidgetDisputeSerializer,
     WidgetMessageSerializer,
 )
@@ -79,7 +80,13 @@ def walk(serializer, path=(), seen=None) -> list[tuple[str, ...]]:
 
 class TestWidgetSerializerFieldGraph:
     def test_no_reachable_field_is_named_for_internal_content(self):
-        for serializer in (WidgetDisputeSerializer(), WidgetMessageSerializer()):
+        # The webhook payload is walked by this same test, not a parallel one:
+        # a second implementation of one guarantee is a second thing to get wrong.
+        for serializer in (
+            WidgetDisputeSerializer(),
+            WidgetMessageSerializer(),
+            WebhookDisputeSerializer(),
+        ):
             for path in walk(serializer):
                 assert path[-1] not in FORBIDDEN_FIELD_NAMES, (
                     f"{type(serializer).__name__} exposes {'.'.join(path)} to the customer. "
@@ -89,7 +96,11 @@ class TestWidgetSerializerFieldGraph:
 
     def test_no_field_sources_from_internal_data(self):
         """A field can be renamed and still read internal data through `source`."""
-        for serializer in (WidgetDisputeSerializer(), WidgetMessageSerializer()):
+        for serializer in (
+            WidgetDisputeSerializer(),
+            WidgetMessageSerializer(),
+            WebhookDisputeSerializer(),
+        ):
             for name, field in serializer.fields.items():
                 source = getattr(field, "source", None) or name
                 assert source not in FORBIDDEN_SOURCES, (
@@ -150,6 +161,7 @@ class TestWidgetSerializerFieldGraph:
             "WidgetMessageSerializer",
             "WidgetDisputeCreateSerializer",
             "WidgetMessageCreateSerializer",
+            "WebhookDisputeSerializer",
         }
         assert declared == covered, (
             f"widget serializers not covered by the leakage test: {declared - covered}"

@@ -155,6 +155,22 @@ def signal_id() -> str:
     return new_id("sig")
 
 
+def simulation_id() -> str:
+    return new_id("sim")
+
+
+def qa_review_id() -> str:
+    return new_id("qar")
+
+
+def webhook_endpoint_id() -> str:
+    return new_id("whe")
+
+
+def webhook_delivery_id() -> str:
+    return new_id("whd")
+
+
 def message_id() -> str:
     return new_id("msg")
 

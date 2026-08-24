@@ -268,6 +268,12 @@ class TestThroughTheApi:
         assert theirs.reference.encode() not in export.files["cases.csv"]
 
 
+# Analytics genuinely reads from the replica (§11.1), which is a separate
+# connection even when it mirrors the same database. A non-transactional test
+# holds its data in an uncommitted transaction on the primary, where that
+# connection cannot see it — so these commit. The alternative was leaving
+# analytics on the primary and a docstring claiming otherwise.
+@pytest.mark.django_db(transaction=True, databases=["default", "replica"])
 class TestBreachAnalysis:
     def test_performance_groups_by_category(self, a_period_of_cases, as_tenant):
         tenant, _ = a_period_of_cases

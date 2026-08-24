@@ -92,7 +92,17 @@ def as_tenant():
 
     @contextlib.contextmanager
     def _as(tenant: Tenant):
-        with context.tenant_context(tenant.pk), db_tenant_context(tenant.pk):
+        from django.db import transaction
+
+        # Opens its own transaction. `SET LOCAL` needs one, and a transactional
+        # test has no ambient transaction to borrow — so a fixture that assumed
+        # one worked everywhere except in the tests that exercise a second
+        # database connection, which is where it was needed most.
+        with (
+            transaction.atomic(),
+            context.tenant_context(tenant.pk),
+            db_tenant_context(tenant.pk),
+        ):
             yield tenant
 
     return _as

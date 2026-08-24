@@ -19,6 +19,7 @@ way to write it.
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Callable, Iterator
 
 from django.db import transaction
@@ -60,3 +61,29 @@ def for_each_tenant[T](work: Callable[[str], T], *, active_only: bool = True) ->
             db_tenant_context(tenant_id),
         ):
             yield work(tenant_id)
+
+
+@contextlib.contextmanager
+def replica_reads(*, using: str = "replica") -> Iterator[str]:
+    """Read on the replica, with the tenant context that connection needs.
+
+    A replica is a **different connection**, and row level security is a property
+    of the session — so a context established on the primary is simply absent
+    there, and a query returns zero rows with nothing raised. Every read routed
+    to the replica goes through here, so "we run analytics on the replica" is a
+    statement about the code rather than about the docstring.
+
+    Falls back to the primary when no replica is configured, rather than
+    returning nothing: an installation with one database should still get its
+    reports.
+    """
+    from django.conf import settings
+    from django.db import transaction
+
+    tenant_id = context.require()
+    if using not in settings.DATABASES:
+        yield tenant_id
+        return
+
+    with transaction.atomic(using=using), db_tenant_context(tenant_id, using=using):
+        yield tenant_id

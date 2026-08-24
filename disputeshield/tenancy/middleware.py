@@ -15,7 +15,7 @@ from __future__ import annotations
 import contextlib
 from collections.abc import Callable, Iterator
 
-from django.db import connection
+from django.db import DEFAULT_DB_ALIAS, connections
 from django.http import HttpRequest, HttpResponse
 
 from disputeshield.tenancy import context
@@ -70,12 +70,19 @@ class NoTransaction(RuntimeError):
     """
 
 
-def set_tenant_context(tenant_id: str) -> None:
+def set_tenant_context(tenant_id: str, *, using: str = DEFAULT_DB_ALIAS) -> None:
     """Set the RLS session variable, local to the current transaction.
 
     The third argument to set_config is is_local=true. Passing false here would
     reintroduce ADR-0005's cross-tenant leak, so it is never parameterised.
+
+    `using` exists because **a read replica is a different connection**. Row level
+    security is a property of the session, so a context established on the primary
+    is simply absent on the replica — and a query issued there returns zero rows
+    with nothing raised. Anything reading from the replica (the regulatory export,
+    the policy simulator) has to establish the context on that connection.
     """
+    connection = connections[using]
     if not connection.in_atomic_block:
         raise NoTransaction(
             "Tenant context must be established inside a transaction. `SET LOCAL` "
@@ -87,15 +94,16 @@ def set_tenant_context(tenant_id: str) -> None:
         cursor.execute("SELECT set_config(%s, %s, true)", [SESSION_VARIABLE, tenant_id])
 
 
-def current_tenant_context() -> str:
+def current_tenant_context(*, using: str = DEFAULT_DB_ALIAS) -> str:
     """Whatever tenant this transaction is currently scoped to. '' means none."""
+    connection = connections[using]
     with connection.cursor() as cursor:
         cursor.execute("SELECT current_setting(%s, true)", [SESSION_VARIABLE])
         return cursor.fetchone()[0] or ""
 
 
 @contextlib.contextmanager
-def db_tenant_context(tenant_id: str) -> Iterator[str]:
+def db_tenant_context(tenant_id: str, *, using: str = DEFAULT_DB_ALIAS) -> Iterator[str]:
     """Scope the RLS variable to a block, restoring what was there before.
 
     `SET LOCAL` is scoped to the *transaction*, not to the Python block that set
@@ -109,9 +117,9 @@ def db_tenant_context(tenant_id: str) -> Iterator[str]:
     is why this restores rather than clears: clearing would deny the outer scope
     that a nested call was running inside.
     """
-    previous = current_tenant_context()
-    set_tenant_context(tenant_id)
+    previous = current_tenant_context(using=using)
+    set_tenant_context(tenant_id, using=using)
     try:
         yield tenant_id
     finally:
-        set_tenant_context(previous)
+        set_tenant_context(previous, using=using)

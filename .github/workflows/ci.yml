@@ -188,6 +188,11 @@ jobs:
       - name: an ungrounded draft is blocked, not flagged
         run: pytest tests/test_intelligence.py -q
 
+      - name: replaying an unchanged policy reproduces the breaches that occurred
+        # If this fails the replay is not using history, and every number the
+        # simulator produces is a confident wrong one.
+        run: pytest tests/test_operations.py -q
+
       # Added in the phase that makes each one real:
       #   phase 4 — widget isolation in both directions
       #   phase 9 — no call path from any module to a payment write

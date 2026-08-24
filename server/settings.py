@@ -110,12 +110,18 @@ def _database(url: str, *, atomic: bool) -> dict:
 
 DATABASES = {
     "default": _database(env("DISPUTESHIELD_DATABASE_URL"), atomic=True),
-    # Analytics and exports only (§11.1). Never written to.
+    # Analytics, exports and policy simulations only (§11.1). Never written to.
     "replica": _database(
         env("DISPUTESHIELD_DATABASE_REPLICA_URL", env("DISPUTESHIELD_DATABASE_URL")),
         atomic=False,
     ),
 }
+
+# Declares the replica as what it is: the same data, arrived at by a different
+# connection. Without this the test runner tries to build a second test database
+# for the alias and then forbids queries to it — so a read path that correctly
+# uses the replica is untestable, and the pressure is to stop using it.
+DATABASES["replica"]["TEST"] = {"MIRROR": "default"}
 
 # Broker and cache are separate instances on purpose (§11.1): flushing the cache
 # must not be capable of destroying the SLA sweep's task queue.

@@ -9,6 +9,57 @@ and released from one tag.
 
 ## [Unreleased]
 
+### Added — phase 11, operating the operation (v1.5)
+
+Amplifiers **A9** SLA simulator, **A15** QA sampling, **A14** outbound webhooks.
+
+- The policy simulator replays a proposed window over real cases using each
+  case's **own** immutable `SLAPolicyVersion`, its calendar as that version
+  referenced it, and its recorded pause intervals read from `SLAEvent` — the
+  evidence, not the clock's materialised view of it. ADR-0004 is what made the
+  historical calendar recoverable at all, so this could not have been built
+  before it.
+- Its **self-check** is the gate: replaying an *unchanged* policy must reproduce
+  the breach count that actually occurred. Anything else means the replay is not
+  using history, and a confident wrong number is worse than no number.
+- QA sampling: uniformly random selection using `secrets` (a sample an agent
+  could predict is one they could prepare for), forced-review criteria as a
+  **module constant** rather than configuration, an agent cannot review their own
+  case, and an agent can respond to any score about their own work — a scorecard
+  nobody may contest is a scorecard nobody trusts.
+- A QA score is a record about the **review**, not the case. Filing an opinion
+  into a case's own history would put an opinion where a regulator reads facts.
+- Outbound webhooks: the §8.2 HMAC scheme with the timestamp inside the signed
+  material, ordered per case so a `dispute.resolved` cannot overtake its
+  `dispute.acknowledged`, at-least-once with a deterministic idempotency key, and
+  **parked rather than dropped** after eight attempts across a day of backoff. A
+  replay keeps its key, so a consumer that already processed it ignores it.
+- The webhook payload serializer is **declared in the widget serializer module**,
+  so the existing field-graph leakage gate walks it — the same test, not a
+  parallel one. A second implementation of one guarantee is a second thing to get
+  wrong.
+
+### Found during phase 11
+
+- **A read replica is a different connection, so row level security has no
+  context there.** A context established on the primary is simply absent on the
+  replica, and a query returns zero rows with nothing raised — a simulation would
+  have reported "0 cases examined", which reads as reassurance rather than as
+  failure. `set_tenant_context` and `db_tenant_context` now take a `using`
+  argument, and `replica_reads()` is the only supported way to read from it.
+- **`analytics.py` claimed it was "routed to the replica" and was not.** The
+  docstring had said so since phase 6 while every query ran on the primary. Now
+  it genuinely does, which cost the analytics tests their non-transactional
+  speed — the alternative was a comment that survives review and means nothing.
+- The `as_tenant` fixture borrowed an ambient transaction that transactional
+  tests do not have, so it worked everywhere except the tests that exercise a
+  second connection. It opens its own now.
+- `DATABASES["replica"]["TEST"] = {"MIRROR": "default"}` — without it the test
+  runner builds a second database for the alias and then forbids queries to it,
+  making a correct read path untestable and creating pressure to stop using it.
+
+### Tests — 552 fast, 9 wall-clock gates, 92% coverage
+
 ### Added — phase 10, intelligence that proposes and never disposes (v1.4)
 
 Amplifiers **A11** triage, **A12** copilot, **A10** root-cause clustering,
