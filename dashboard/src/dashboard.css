@@ -436,3 +436,72 @@ span.ds-help { display: block; }
   .ds-policies, .ds-policy-detail { grid-template-columns: minmax(0, 1fr); }
   .ds-history { position: static; }
 }
+
+/* --- widget configuration ------------------------------------------------- */
+
+.ds-widget-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: calc(var(--ds-space) * 4); align-items: start; }
+.ds-widget-form { max-width: none; margin-top: 0; padding-top: 0; border-top: 0; }
+.ds-widget-form .ds-h2 { margin-top: 0; }
+.ds-origins { margin-top: calc(var(--ds-space) * 4); max-width: 720px; }
+
+/* A category with no policy is not a deadline, so it takes everything except
+   colour: first position, a heavy rule, a label and the count. Stretching
+   "colour is for time" a second time would leave the console with two kinds of
+   red meaning two different things. */
+.ds-broken {
+  border-left-width: 4px;
+  border-left-color: var(--ds-ink);
+  background: var(--ds-raised);
+  margin-bottom: calc(var(--ds-space) * 3);
+}
+
+/* --- the preview ---------------------------------------------------------- */
+
+/* The one element in the console whose colour is not about time. It belongs to
+   the tenant, it is scoped to this subtree by an inline custom property, and the
+   frame and caption make it read as a picture of another product. */
+.ds-preview { margin: 0; display: grid; gap: var(--ds-space); position: sticky; top: var(--ds-space); }
+.ds-preview-caption {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--ds-muted); font-weight: 600;
+}
+.ds-preview-frame {
+  position: relative; height: 320px; overflow: hidden;
+  border: 1px solid var(--ds-line); background: var(--ds-bg);
+  padding: calc(var(--ds-space) * 1.5);
+  display: flex;
+}
+.ds-preview-bottom-right .ds-preview-widget { right: var(--ds-space); }
+.ds-preview-bottom-left .ds-preview-widget { left: var(--ds-space); }
+
+.ds-preview-page { display: grid; gap: var(--ds-space); align-content: start; width: 100%; }
+.ds-preview-bar { height: 8px; background: var(--ds-raised); display: block; }
+.ds-preview-bar-short { width: 55%; }
+
+.ds-preview-widget {
+  position: absolute; bottom: var(--ds-space); width: 220px;
+  border: 1px solid var(--ds-line); border-radius: var(--preview-radius);
+  background: #fff; padding: var(--ds-space); display: grid; gap: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.ds-preview-title { margin: 0; font-weight: 600; font-size: 13px; }
+.ds-preview-hint { margin: 0; font-size: 11px; color: var(--ds-muted); }
+.ds-preview-options { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ds-preview-option {
+  font-size: 11px; padding: 4px 6px;
+  border: 1px solid var(--ds-line); border-radius: var(--preview-radius);
+}
+.ds-preview-option:first-child {
+  border-color: var(--preview-primary);
+  box-shadow: 0 0 0 1px var(--preview-primary);
+}
+.ds-preview-button {
+  background: var(--preview-primary); color: #fff;
+  border-radius: var(--preview-radius);
+  font-size: 11px; font-weight: 600; text-align: center; padding: 6px;
+}
+
+@media (max-width: 1100px) {
+  .ds-widget-layout { grid-template-columns: minmax(0, 1fr); }
+  .ds-preview { position: static; }
+}

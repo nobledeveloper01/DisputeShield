@@ -23,6 +23,7 @@ test('the compliance routes resolve', () => {
   assert.deepEqual(parse('#/reports'), { name: 'reports' });
   assert.deepEqual(parse('#/analysis'), { name: 'analysis' });
   assert.deepEqual(parse('#/policies'), { name: 'policies' });
+  assert.deepEqual(parse('#/widget'), { name: 'widget' });
 });
 
 test('an unknown route falls back to the queue rather than blank', () => {

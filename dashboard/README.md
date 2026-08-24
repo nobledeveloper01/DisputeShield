@@ -17,8 +17,9 @@ cannot change an SLA policy; a compliance user can change a policy, and the chan
 is recorded, versioned and rendered next to the breach data it affects.
 
 **Built so far:** the queue (`src/queue/`), the case view (`src/case/`), SLA
-policies (`src/policies/`), breach analysis (`src/analysis/`) and report delivery
-(`src/reports/`). Widget config and settings are still to come.
+policies (`src/policies/`), the widget configuration (`src/widget/`), breach
+analysis (`src/analysis/`) and report delivery (`src/reports/`). Settings are
+still to come.
 
 ## Running it
 
@@ -72,6 +73,28 @@ terms are immutable. The two are reconciled in `disputeshield/sla/policies.py`
 rather than by picking one: a PATCH is accepted and its effect is to publish a
 new version. A sparse body carries forward what it did not mention, so a PATCH of
 one field cannot publish a version whose other terms silently became defaults.
+
+## The widget configuration, and the one exception to the colour rule
+
+The preview is the only element in this console whose colour is not about time,
+and the exception is deliberate. DESIGN.md's rule governs *our* chrome; the
+colour in the preview belongs to the tenant, and the widget's whole point is that
+it looks like their product rather than ours. A preview rendered in ink would be
+a preview of something that does not exist.
+
+Two things keep the exception from leaking: the colour is applied through an
+inline custom property scoped to the preview subtree, so nothing outside it can
+inherit a tenant's brand (asserted in the browser suite), and the preview is
+drawn inside a labelled frame so it reads as a picture of another product.
+
+The screen leads with a cross-check rather than with theming. A category the
+widget offers with no SLA policy behind it lets a customer choose it and then
+refuses their filing with "Unknown category" — and nobody on this side of the
+product finds out. That warning is **monochrome**, and that is a decision rather
+than an omission: a category with no policy is not a deadline, and stretching
+"colour is reserved for time" a second time would leave the console with two
+kinds of red meaning two different things. It gets first position, a heavy rule,
+a label and the count instead.
 
 ## Breach analysis
 

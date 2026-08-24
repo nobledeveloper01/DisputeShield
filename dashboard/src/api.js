@@ -45,6 +45,14 @@ export function createClient({ baseUrl }) {
     resume: (id, reason) =>
       request(`/v1/disputes/${id}/resume/`, { method: 'POST', body: { reason } }),
 
+    widgetConfig: () => request('/v1/widget-config'),
+    saveWidgetConfig: (payload) =>
+      request('/v1/widget-config', { method: 'PATCH', body: payload }),
+    addOrigin: (origin) =>
+      request('/v1/widget-config/origins', { method: 'POST', body: { origin } }),
+    removeOrigin: (id) =>
+      request(`/v1/widget-config/origins/${id}`, { method: 'DELETE' }),
+
     listPolicies: () => request('/v1/sla-policies'),
     getPolicy: (id) => request(`/v1/sla-policies/${id}`),
     publishPolicy: (id, terms) =>

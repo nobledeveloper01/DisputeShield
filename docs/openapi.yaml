@@ -1250,6 +1250,88 @@ paths:
         '400':
           description: Terms that cannot describe a real window.
         '404': *id002
+  /v1/widget-config:
+    get:
+      summary: Widget theming, categories and embed origins
+      operationId: getWidgetConfig
+      security:
+      - agentKey: []
+      description: 'Readable by any role that can read. `categories[].has_policy` is the cross-check
+        this endpoint exists for: a category the widget offers with no SLA policy behind it lets a
+        customer choose it and then fails their filing with "Unknown category", and nothing in the
+        data model prevents the combination. `policies_not_offered` is reported rather than flagged —
+        a policy without a widget category is how a channel-only category works. `can_edit` and
+        `can_change_origins` say what this role may do, so a client can decline to offer a control it
+        knows will be refused; the refusal itself is still the server''s.'
+      responses:
+        '200':
+          description: Theme, categories with their policy status, origins and the frame-ancestors
+            header as it will be sent.
+        '404': *id002
+    patch:
+      summary: Change theming or the category list
+      operationId: updateWidgetConfig
+      security:
+      - agentKey: []
+      description: 'Compliance role only. A colour the browser cannot parse is refused: the widget
+        renders inside a customer''s page, and an unparseable value leaves an unstyled control on it.
+        A patch that changes nothing writes no audit record.'
+      responses:
+        '200':
+          description: The configuration as it now stands.
+        '400':
+          description: An unparseable colour or an unknown position.
+        '404': *id002
+  /v1/widget-config/origins:
+    post:
+      summary: Register an embed origin
+      operationId: registerWidgetOrigin
+      security:
+      - agentKey: []
+      description: '**Owner only.** This widens `frame-ancestors`, which is the boundary ADR-0001
+        exists to create and the reason a leaked publishable key is harmless — an attacker''s page is
+        not on this list. Widening it is closer to changing an account setting than to changing a
+        theme, so it is not reachable from a role granted for compliance work. A trailing path is
+        refused: `frame-ancestors` ignores the path, so `https://app.acme.io/checkout` would
+        authorise the whole of `https://app.acme.io` while whoever typed it believes otherwise.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [origin]
+              properties:
+                origin:
+                  type: string
+                  description: Scheme, host and optional port. No path, no wildcard, not `null`.
+      responses:
+        '201':
+          description: Registered.
+        '200':
+          description: Already registered.
+        '400':
+          description: Not an origin. The message names what the value would actually authorise.
+        '404': *id002
+  /v1/widget-config/origins/{origin_id}:
+    delete:
+      summary: Withdraw an embed origin
+      operationId: withdrawWidgetOrigin
+      security:
+      - agentKey: []
+      description: Owner only. Audited before the row is removed — afterwards nothing is left to say
+        which origin was withdrawn or by whom, and "the widget stopped working on our checkout page"
+        is a support ticket that needs an answer.
+      parameters:
+      - name: origin_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Withdrawn. The widget stops rendering there immediately.
+        '404': *id002
   /v1/audit/verify:
     get:
       summary: Verify the audit chain

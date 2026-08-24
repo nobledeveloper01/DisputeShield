@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Analysis from './analysis/Analysis.jsx';
 import Case from './case/Case.jsx';
 import Policies from './policies/Policies.jsx';
+import WidgetConfig from './widget/WidgetConfig.jsx';
 import Queue from './queue/Queue.jsx';
 import Recipients from './reports/Recipients.jsx';
 import Schedules from './reports/Schedules.jsx';
@@ -41,6 +42,13 @@ export default function App({ client }) {
         </a>
         <a
           className="ds-link"
+          href="#/widget"
+          aria-current={route.name === 'widget' ? 'page' : undefined}
+        >
+          Widget
+        </a>
+        <a
+          className="ds-link"
           href="#/reports"
           aria-current={route.name === 'reports' ? 'page' : undefined}
         >
@@ -52,6 +60,7 @@ export default function App({ client }) {
       {route.name === 'case' ? <CaseScreen client={client} id={route.id} /> : null}
       {route.name === 'policies' ? <PoliciesScreen client={client} /> : null}
       {route.name === 'analysis' ? <AnalysisScreen client={client} /> : null}
+      {route.name === 'widget' ? <WidgetScreen client={client} /> : null}
       {route.name === 'reports' ? <ReportsScreen client={client} /> : null}
     </>
   );
@@ -172,6 +181,58 @@ function Failed({ message }) {
  * partially-rendered list of schedules invites a decision made on half the
  * picture.
  */
+function WidgetScreen({ client }) {
+  const [config, setConfig] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      setConfig(await client.widgetConfig());
+      setError('');
+    } catch (problem) {
+      setError(problem.message);
+    }
+  }, [client]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const guard = useCallback(
+    async (action) => {
+      setBusy(true);
+      try {
+        await action();
+        await load();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [load]
+  );
+
+  if (error) return <Failed message={error} />;
+  if (config === null) return <Loading />;
+
+  return (
+    <main className="ds-app ds-app-wide">
+      <WidgetConfig
+        config={config}
+        // What a role may do is decided by the server, which answers 404 to a
+        // request it will not honour. These only decide whether a control is
+        // offered — a disabled button is a courtesy, never the check.
+        canEdit={config.can_edit}
+        canChangeOrigins={config.can_change_origins}
+        busy={busy}
+        onSave={(payload) => guard(() => client.saveWidgetConfig(payload))}
+        onAddOrigin={(origin) => guard(() => client.addOrigin(origin))}
+        onRemoveOrigin={(entry) => guard(() => client.removeOrigin(entry.id))}
+      />
+    </main>
+  );
+}
+
 function PoliciesScreen({ client }) {
   const [list, setList] = useState(null);
   const [calendars, setCalendars] = useState([]);

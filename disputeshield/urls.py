@@ -29,6 +29,11 @@ from disputeshield.api.views_widget import (
     WidgetConfigView,
     WidgetDisputeViewSet,
 )
+from disputeshield.api.views_widget_admin import (
+    WidgetAdminView,
+    WidgetOriginDetailView,
+    WidgetOriginView,
+)
 
 app_name = "disputeshield"
 
@@ -78,6 +83,13 @@ urlpatterns = [
         "v1/sla-policies/<str:policy_id>",
         SLAPolicyDetailView.as_view(),
         name="sla-policy-detail",
+    ),
+    path("v1/widget-config", WidgetAdminView.as_view(), name="widget-admin"),
+    path("v1/widget-config/origins", WidgetOriginView.as_view(), name="widget-origins"),
+    path(
+        "v1/widget-config/origins/<str:origin_id>",
+        WidgetOriginDetailView.as_view(),
+        name="widget-origin-detail",
     ),
     path("v1/audit/verify", AuditVerifyView.as_view(), name="audit-verify"),
     path("v1/", include(router.urls)),

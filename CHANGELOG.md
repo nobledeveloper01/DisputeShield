@@ -11,6 +11,44 @@ and released from one tag.
 
 ### Added
 
+- **Widget configuration: the management API and the view** —
+  `GET/PATCH /v1/widget-config`, `POST/DELETE /v1/widget-config/origins`, and
+  `dashboard/src/widget/`. §7.3 listed the surface; nothing implemented it.
+- **The screen leads with a cross-check, not with theming.** A category the
+  widget offers with no SLA policy behind it lets a customer choose it and then
+  refuses their filing with "Unknown category" — after they have already chosen.
+  Nothing in the data model prevents the combination and nobody on the operator's
+  side finds out, so the API reports it per category and the dashboard puts it
+  first. A policy with no widget category is reported rather than flagged: a
+  channel-only category is a normal arrangement.
+- The broken-category warning is **monochrome**, and that is a decision rather
+  than an omission. A category with no policy is not a deadline, and stretching
+  "colour is reserved for time" a second time would leave the console with two
+  kinds of red meaning two different things. It gets first position, a heavy
+  rule, a label and the count instead.
+- **Registering an embed origin is owner-only** — a new `IsOwner` permission.
+  It widens `frame-ancestors`, which is the boundary ADR-0001 exists to create
+  and the reason a leaked publishable key is harmless. A compliance officer is
+  trusted with the regulatory export and is still not the right person to decide
+  who may embed the product. Theming and categories stay compliance-level.
+- An origin with a trailing path is refused **with what it would actually
+  authorise**: `frame-ancestors` ignores the path, so `https://app.acme.io/checkout`
+  authorises the whole of `https://app.acme.io` while whoever typed the longer
+  form believes they restricted something.
+- The `frame-ancestors` header is quoted **exactly as the browser receives it**.
+  §11.6 says an unregistered domain is the most common widget support ticket by a
+  wide margin, and a screen that paraphrases the header leaves an operator
+  guessing at the one line that decides it.
+- Withdrawing an origin is audited **before** the row is removed: afterwards
+  nothing is left to say which origin went or by whom, and "the widget stopped
+  working on our checkout page" is a ticket that needs an answer.
+- **The preview is the one element in the console whose colour is not about
+  time**, and the exception is deliberate — DESIGN.md's rule governs our chrome,
+  while the colour in a preview belongs to the tenant, and a preview rendered in
+  ink would be a preview of something that does not exist. The tenant's colour is
+  applied through an inline custom property scoped to the preview subtree, so
+  nothing outside it can inherit their brand; the browser suite asserts it does
+  not escape.
 - **SLA policies: the management API and the view** —
   `GET/POST /v1/sla-policies`, `GET/PATCH /v1/sla-policies/{id}`, and
   `dashboard/src/policies/`. §7.3 documented the endpoints; nothing implemented
@@ -262,6 +300,11 @@ and released from one tag.
 
 ### Fixed
 
+- **The widget preview was not live.** The draft theme lived inside the theming
+  form while the preview rendered from the saved configuration, so a colour only
+  appeared in the preview after it had been published — which would mean pushing
+  it to real customers' pages to find out what it looks like. That is not a
+  preview. The draft now lives above both.
 - Developer commentary had leaked into two screens as user-facing help text —
   copy explaining *why a panel was placed where it is* tells a compliance officer
   nothing. The reasoning moved into comments and the help text now says what the

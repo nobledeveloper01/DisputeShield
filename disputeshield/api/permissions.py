@@ -58,3 +58,17 @@ class CanReadOnly(RolePermission):
 
 class CanChangeCompliancePolicy(RolePermission):
     allowed_roles = (Agent.Role.OWNER, Agent.Role.COMPLIANCE)
+
+
+class IsOwner(RolePermission):
+    """The narrowest role, for the settings that decide who can reach the product.
+
+    Registering an embed origin is the clearest case. It widens `frame-ancestors`,
+    which is the boundary ADR-0001 exists to create and the one the product is
+    sold on — a leaked publishable key is harmless precisely because an attacker's
+    page is not on this list. Widening it is closer to a change of account
+    settings than to a change of widget theming, and it should not be reachable
+    from a role granted for compliance work.
+    """
+
+    allowed_roles = (Agent.Role.OWNER,)

@@ -317,6 +317,50 @@ export const POLICY_DETAIL = {
   ]
 };
 
+export const WIDGET = {
+  theme: {
+    primary_colour: '#0B5FFF',
+    radius: '8px',
+    logo_url: '',
+    position: 'bottom-right',
+    locale: 'en'
+  },
+  positions: ['bottom-right', 'bottom-left'],
+  categories: [
+    { name: 'failed_transfer', has_policy: true },
+    // The combination nothing in the data model prevents.
+    { name: 'duplicate_charge', has_policy: false }
+  ],
+  policies_not_offered: ['atm_dispense_error'],
+  origins: [
+    { id: 'org_1', origin: 'https://app.acme.test' },
+    { id: 'org_2', origin: 'https://checkout.acme.test' }
+  ],
+  frame_ancestors: "'self' https://app.acme.test https://checkout.acme.test",
+  can_edit: true,
+  can_change_origins: true
+};
+
+export const WIDGET_READONLY = { ...WIDGET, can_edit: false, can_change_origins: false };
+export const WIDGET_SOUND = {
+  ...WIDGET,
+  categories: [{ name: 'failed_transfer', has_policy: true }]
+};
+
+export async function stubWidget(page, payload = WIDGET) {
+  await page.route('**/v1/widget-config', (route) =>
+    route.request().method() === 'GET'
+      ? route.fulfill({ json: payload })
+      : route.fulfill({ json: payload })
+  );
+  await page.route('**/v1/widget-config/origins', (route) =>
+    route.fulfill({ status: 201, json: { id: 'org_3', origin: 'https://new.acme.test' } })
+  );
+  await page.route('**/v1/widget-config/origins/*', (route) =>
+    route.fulfill({ status: 204, body: '' })
+  );
+}
+
 export async function stubPolicies(page) {
   await page.route('**/v1/sla-policies', (route) => route.fulfill({ json: POLICIES }));
   await page.route('**/v1/sla-policies/*', (route) =>
