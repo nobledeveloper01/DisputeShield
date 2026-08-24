@@ -131,6 +131,62 @@ class TestByteReproducibility:
             ).files["report.pdf"]
         assert b"/FontFile" not in document
 
+    def test_unrelated_audit_activity_does_not_change_the_document(
+        self, a_period_of_cases, as_tenant
+    ):
+        """The gate the back-to-back build could not see.
+
+        The cover used to print the tenant's live chain head and its running
+        record count, so a *closed* period produced different bytes whenever
+        anything at all was written anywhere in the tenant — including the audit
+        record that queueing an emailed copy of the report writes for itself.
+        Building twice in a row cannot catch that; building either side of an
+        unrelated write can.
+        """
+        from disputeshield import audit
+
+        tenant, _ = a_period_of_cases
+        with as_tenant(tenant):
+            first = regulatory.build(
+                tenant=tenant, period_from=PERIOD_FROM, period_to=PERIOD_TO
+            ).files["report.pdf"]
+
+            audit.append(
+                tenant=tenant,
+                event_type="report.delivery_requested",
+                subject_type="report",
+                subject_id="ntf_unrelated",
+                actor_type="user",
+                actor_id="agt_1",
+                payload={"unrelated": True},
+            )
+
+            second = regulatory.build(
+                tenant=tenant, period_from=PERIOD_FROM, period_to=PERIOD_TO
+            ).files["report.pdf"]
+
+        assert first == second
+
+    def test_a_period_that_gains_a_case_does_produce_a_different_document(
+        self, a_period_of_cases, as_tenant, make_dispute, make_policy
+    ):
+        """The other half. Reproducibility must not be achieved by ignoring changes."""
+        tenant, _ = a_period_of_cases
+        with as_tenant(tenant):
+            first = regulatory.build(
+                tenant=tenant, period_from=PERIOD_FROM, period_to=PERIOD_TO
+            ).files["report.pdf"]
+
+        version = make_policy(tenant, resolution_hours=8)
+        make_dispute(tenant, policy_version=version, customer_ref="usr_late")
+
+        with as_tenant(tenant):
+            second = regulatory.build(
+                tenant=tenant, period_from=PERIOD_FROM, period_to=PERIOD_TO
+            ).files["report.pdf"]
+
+        assert first != second
+
 
 class TestTheManifestCoversIt:
     def test_the_pdf_digest_is_published_and_signed(self, a_period_of_cases, as_tenant):
@@ -195,7 +251,11 @@ class TestWhatTheDocumentSays:
         tenant, _ = a_period_of_cases
         body = self._text(tenant, as_tenant)
         assert "does not establish" in body or "does and does not" in body
-        assert "External anchor" in body
+        assert "only an external anchor" in body.lower()
+        # And it says where the live figures went, rather than silently omitting
+        # them — an absent attestation figure reads as "there isn't one".
+        assert "deliberately not in this document" in body
+        assert "/v1/audit/verify" in body
 
     def test_it_reports_the_counts(self, a_period_of_cases, as_tenant):
         tenant, cases = a_period_of_cases

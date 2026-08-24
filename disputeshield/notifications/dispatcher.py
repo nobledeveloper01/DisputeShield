@@ -60,6 +60,28 @@ class EmailChannel(Channel):
         )
 
 
+class ReportEmailChannel(Channel):
+    """A regulatory export, to an address that was registered in advance.
+
+    Its own channel rather than a branch inside `EmailChannel`, because the two
+    have opposite rules about content. An SLA warning must carry no case content
+    into an inbox; this one *is* the case content, by design, and everything that
+    makes that safe — the allowlist, the rebuild-and-verify, the audit record —
+    lives in `disputeshield.reports.delivery`. Keeping them apart means neither
+    set of rules can be relaxed by editing the other.
+    """
+
+    name = "report_email"
+
+    def send(self, notification: NotificationOutbox) -> None:
+        from disputeshield.reports import delivery
+
+        delivery.deliver(notification)
+        # After the send, never before: an audit record claiming a period left
+        # the building when it did not is a false statement in the evidence.
+        delivery.record_delivered(notification)
+
+
 class SlackChannel(Channel):
     name = "slack"
 
@@ -87,15 +109,27 @@ class ConsoleChannel(Channel):
         )
 
 
+# Channels that resolve to a real implementation even when nothing is configured.
+# The console fallback below is a convenience for the SLA warning channel in
+# development; for a regulatory export it would be a report marked `sent`, with an
+# audit record saying a period left the building, that nobody ever received.
+# Whether a message actually leaves the machine is Django's `EMAIL_BACKEND` to
+# decide — which is console in development and in-memory under test, so this path
+# is exercised end to end without a provider.
+BUILT_IN: dict[str, type[Channel]] = {"report_email": ReportEmailChannel}
+
+
 def get_channel(name: str) -> Channel:
     from disputeshield import conf
 
     configured = conf.get("NOTIFICATION_CHANNELS")
     path = configured.get(name)
-    if not path:
-        return ConsoleChannel()
-    module_name, _, class_name = path.rpartition(".")
-    return getattr(importlib.import_module(module_name), class_name)()
+    if path:
+        module_name, _, class_name = path.rpartition(".")
+        return getattr(importlib.import_module(module_name), class_name)()
+    if name in BUILT_IN:
+        return BUILT_IN[name]()
+    return ConsoleChannel()
 
 
 def dispatch(*, limit: int = 100) -> DispatchResult:

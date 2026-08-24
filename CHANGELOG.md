@@ -11,6 +11,54 @@ and released from one tag.
 
 ### Added
 
+- **Email delivery of the regulatory export** — `POST /v1/reports/regulatory/email`,
+  compliance-only. Producing a supervisory return by hand from a download was the
+  manual step §6.5 exists to remove.
+- **Recipients come from an allowlist, never from the request.** An endpoint that
+  emails a whole period's disclosure to an address supplied by the caller is an
+  exfiltration route with an OpenAPI entry. Addresses are registered first at
+  `/v1/reports/recipients` — compliance-only, a stated reason required, audited
+  against the acting agent — so the send has nothing interesting left to
+  authorise. That was the point of separating them.
+- One unknown address **refuses the whole request**, naming what it rejected. A
+  partial send is a supervisor waiting for a report that four of five people
+  received, and nobody noticing for a week.
+- **Nothing is attached to the queue row** (ADR-0008). The payload holds the
+  period and the digests the export had when it was requested; the dispatcher
+  rebuilds the bundle and sends only if they still match. Case content never
+  waits in a queue table, and a period that changed in between **fails loudly**
+  into the outbox's existing retry and parking rather than delivering a bundle
+  nobody promised. This is the first thing in the system that *depends* on
+  byte-reproducibility rather than merely asserting it.
+- Delivery is idempotent on (period, recipients), so a retried request during an
+  incident cannot page a regulator's inbox twice.
+- The email body restates each file's SHA-256 and the manifest signature, and
+  tells the reader to check them against `GET /v1/reports/regulatory` — a
+  recipient who trusts an attachment because the email said to has verified
+  nothing.
+- The audit trail records the request and the delivery **separately**: who asked
+  for a period to be sent outside has an answer even when the send later fails,
+  and `report.delivered` is written only after the send succeeded, so the trail
+  never contains a false statement about a disclosure.
+- Recipients are **deactivated, never deleted**. "Who could receive our disputes
+  data in March" is a question a supervisor is entitled to ask.
+- `disputeshield_seed_report_recipients` seeds sample recipients on a non-live
+  tenant. Every address is under `example.test` or `.invalid` — domains RFC 2606
+  and RFC 6761 reserve so they can never resolve — so a bug in delivery cannot
+  reach a real inbox at the DNS layer rather than merely at the review layer. The
+  command refuses a `live` tenant outright.
+- `disputeshield_doctor` gained a **fatal** `report email delivery` check: an
+  installation with registered recipients and a console or in-memory mail backend
+  reports every send as successful and audits it as a disclosure that happened.
+  It is the one failure on this path that puts a false statement in the audit
+  trail, which is why it fails the preflight rather than warning.
+- [`docs/runbook-report-delivery.md`](docs/runbook-report-delivery.md) for a
+  queued export that did not arrive. Most of it is about telling a deliberate
+  refusal apart from a failure, including the one refusal that means a defect
+  rather than an operational event.
+- `EMAIL_BACKEND` defaults to the console backend, and Django swaps it for the
+  in-memory one under test. No address in this repository is ever written to.
+
 - **`format=pdf` on the regulatory export (§7.3).** The specification has always
   listed `csv|pdf`; only the CSVs shipped. The PDF is the document a supervisor
   reads — cover attestation, period summary, the complaints table, then per-case
@@ -43,6 +91,27 @@ and released from one tag.
 
 ### Fixed
 
+- **A closed period did not export identically twice, once the PDF existed.** The
+  cover page printed the tenant's live audit-chain head and its running record
+  count — statements about the system *now*, rendered into digest-covered bytes —
+  so re-exporting a finished period produced a different document whenever
+  anything at all was written anywhere in the tenant. Every emailed report would
+  have refused to send, including on the audit record that requesting the
+  delivery writes for itself. The document now carries facts about the *period*
+  (case count, the history records covering it, imported-case count); the live
+  figures are published in `manifest.json` and at `GET /v1/audit/verify`, and the
+  page says so rather than silently omitting them.
+- **The reproducibility gate could not have caught that.** It built twice in a
+  row, which is exactly the case where nothing has changed. It now builds either
+  side of an unrelated audit write, and a second test asserts that a period which
+  genuinely gains a case *does* produce a different document — so the gate cannot
+  be satisfied by ignoring changes.
+- **An unconfigured `report_email` channel would have silently no-opped.** The
+  dispatcher falls back to the console channel for anything not configured, which
+  for an SLA warning in development is a convenience; here it would mark a report
+  `sent` and write an audit record saying a period left the building when nothing
+  did. The report channel now resolves to a real implementation by default, and
+  whether a message leaves the machine is `EMAIL_BACKEND`'s decision.
 - **`?format=pdf` and `?format=csv` answered 404 before the view ran.** DRF
   reserves the `format` query parameter to select a renderer by name and raises
   `NotFound` for one it does not recognise, so two of the four formats §7.3

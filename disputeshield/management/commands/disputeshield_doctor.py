@@ -46,6 +46,7 @@ class Command(BaseCommand):
             self._check_row_level_security(),
             self._check_clock_skew(),
             self._check_sweep_heartbeat(),
+            self._check_report_delivery(),
         ]
 
         for check in checks:
@@ -147,6 +148,48 @@ class Command(BaseCommand):
                 fatal=False,
             )
         return Check("sla sweep heartbeat", True, f"last swept {age:.0f}s ago")
+
+    def _check_report_delivery(self) -> Check:
+        """A configured report allowlist with no way to reach it.
+
+        The console and in-memory mail backends are the right defaults for
+        development and CI, and the wrong thing entirely on an installation where
+        somebody has registered a supervisor's address. Delivery would report
+        success, the audit trail would record that a period left the building, and
+        the report would exist only in a log file. Checked here rather than
+        asserted at startup because it is only wrong once an allowlist exists.
+        """
+        from django.conf import settings
+
+        from disputeshield.models import ReportRecipient
+        from disputeshield.tenancy.platform import for_each_tenant
+
+        backend = getattr(settings, "EMAIL_BACKEND", "")
+        # Named by the backend module — "console", "locmem", "smtp" — because
+        # every one of them ends in `EmailBackend`, which tells an operator
+        # nothing about whether mail actually leaves the machine.
+        kind = backend.rsplit(".", 2)[-2] if backend.count(".") >= 2 else backend
+        if kind not in {"console", "locmem", "dummy"}:
+            return Check("report email delivery", True, f"{kind} backend configured")
+
+        registered = sum(
+            for_each_tenant(
+                lambda _tenant_id: ReportRecipient.objects.filter(is_active=True).count()
+            )
+        )
+        if not registered:
+            return Check(
+                "report email delivery",
+                True,
+                f"{kind} backend, but no recipients are registered",
+                fatal=False,
+            )
+        return Check(
+            "report email delivery",
+            False,
+            f"{registered} recipient(s) registered but EMAIL_BACKEND is the {kind} backend. "
+            "A report would be marked delivered and audited as such without leaving the machine.",
+        )
 
     def _check_clock_skew(self) -> Check:
         """Every deadline in the product is computed against a clock. It should be the same one."""

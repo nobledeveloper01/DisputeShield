@@ -120,3 +120,5 @@ their own supervisor.
 - Deployment shape and the single-beat-replica requirement: §11.1
 - Why deadlines are materialised, and why that makes catch-up provably correct:
   [ADR-0007](adr/0007-materialised-deadlines.md)
+- A regulatory export that was queued for email and did not arrive:
+  [runbook-report-delivery.md](runbook-report-delivery.md)

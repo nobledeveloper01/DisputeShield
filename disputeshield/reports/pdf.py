@@ -174,11 +174,20 @@ def _furniture(canvas, document) -> None:
     canvas.restoreState()
 
 
+def _history_rows(export) -> int:
+    """Records covering this period, counted from the export's own history.csv.
+
+    Derived from the bundle rather than from a live query on purpose: it is a
+    fact about the period, so it is stable for a closed one, and it is the number
+    a reader can check by opening the attached CSV.
+    """
+    return max(export.files["history.csv"].decode().count("\n") - 1, 0)
+
+
 def _cover(export, tenant, styles) -> list:
     manifest = export.manifest
     integrity = manifest["integrity"]
     chain = integrity["chain"]
-    attestation = integrity["attestation"]
     anchor = integrity.get("anchor", {})
 
     story = [
@@ -195,7 +204,8 @@ def _cover(export, tenant, styles) -> list:
     verdict = "VERIFIED" if chain["verified"] else "FAILED VERIFICATION"
     story.append(
         Paragraph(
-            f"<b>Audit chain: {verdict}</b> — {chain['records_checked']} records checked.",
+            f"<b>Audit chain: {verdict}</b> — {_history_rows(export)} records cover "
+            f"the {manifest['case_count']} cases in this period.",
             ParagraphStyle(
                 "verdict",
                 parent=styles["body"],
@@ -223,18 +233,10 @@ def _cover(export, tenant, styles) -> list:
     story.append(
         _facts(
             [
-                ("Signed checkpoint", "present" if attestation["present"] else "absent"),
-                (
-                    "Checkpoint signature",
-                    {True: "valid", False: "INVALID", None: "n/a"}[attestation["signature_valid"]],
-                ),
-                ("Chain head", attestation["head_hash"] or "—"),
-                (
-                    "External anchor",
-                    "present" if attestation["externally_anchored"] else "none",
-                ),
-                ("Anchoring authority", anchor.get("authority") or "—"),
-                ("Unanchored checkpoints", str(anchor.get("unanchored_checkpoints", 0))),
+                ("Cases in period", str(manifest["case_count"])),
+                ("History records", str(_history_rows(export))),
+                ("Imported from a prior system", str(manifest.get("imported_case_count", 0))),
+                ("Anchoring authority", anchor.get("authority") or "none configured"),
             ],
             styles,
         )
@@ -247,8 +249,21 @@ def _cover(export, tenant, styles) -> list:
             "shows that no record was altered relative to its neighbours. The signature "
             "shows that DisputeShield computed that check and obtained this result. "
             "Neither establishes <i>when</i> the chain existed — only an external "
-            "anchor from a third-party timestamp authority does that, and the line "
-            "above states whether one is present.",
+            "anchor from a third-party timestamp authority does that.",
+            styles["muted"],
+        ),
+        Paragraph(
+            "<b>The live figures are deliberately not in this document.</b> The chain "
+            "head, the current checkpoint and its signature, the count of records held "
+            "in total and whether the latest checkpoint has been externally anchored "
+            "are all statements about this system <i>now</i> rather than about this "
+            "period. Printing them here would mean a closed period produced a different "
+            "document every time it was exported, and a supervisor who asks for the same "
+            "period twice and receives two different files has been handed a reason to "
+            "doubt everything in both. They are published in the accompanying "
+            "<font face='Courier'>manifest.json</font> and at "
+            "<font face='Courier'>GET /v1/audit/verify</font>, which is where a figure "
+            "about the present belongs.",
             styles["muted"],
         ),
         Paragraph(

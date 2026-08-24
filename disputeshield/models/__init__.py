@@ -56,6 +56,7 @@ from disputeshield.models.operations import (
     WebhookEndpoint,
 )
 from disputeshield.models.policy import SLAPolicy, SLAPolicyVersion
+from disputeshield.models.reports import ReportRecipient
 from disputeshield.models.returns import RegulatoryReturn, ReturnTemplate
 from disputeshield.models.scheme import ReasonCode, Representment
 from disputeshield.models.tenant import Tenant
@@ -96,6 +97,7 @@ __all__ = [
     "QaReview",
     "ReasonCode",
     "RegulatoryReturn",
+    "ReportRecipient",
     "Representment",
     "ResponseTemplate",
     "ReturnTemplate",

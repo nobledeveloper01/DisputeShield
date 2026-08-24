@@ -930,6 +930,112 @@ paths:
         '400':
           description: An unrecognised `format`.
         '404': *id002
+  /v1/reports/regulatory/email:
+    post:
+      summary: Email a regulatory export to registered recipients
+      operationId: emailRegulatoryReport
+      security:
+      - agentKey: []
+      description: 'Compliance role only. Recipients are chosen from the tenant''s allowlist, never
+        from this request: an endpoint that emails a whole period''s disclosure to an address supplied
+        by the caller is an exfiltration route with an OpenAPI entry. Register the address at
+        `/v1/reports/recipients` first. The send is queued rather than performed inline, and it is
+        idempotent on (period, recipients) so a retried request during an incident cannot deliver
+        twice. Nothing is attached to the queue row — the bundle is rebuilt at send time and delivered
+        only if its digests still match the ones recorded here, so case content never waits in a queue
+        table and a period that changed in between refuses rather than sending.'
+      parameters:
+      - $ref: '#/components/parameters/PeriodFrom'
+      - $ref: '#/components/parameters/PeriodTo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipients]
+              properties:
+                recipients:
+                  type: array
+                  items:
+                    type: string
+                    format: email
+                  description: Each must already be an active entry on the allowlist.
+                note:
+                  type: string
+                  maxLength: 500
+                  description: Recorded in the audit trail and shown in the email body.
+      responses:
+        '202':
+          description: Queued. The response lists the recipients and the digests promised.
+        '400':
+          description: An address that is not on the allowlist. Names the addresses rejected.
+        '413':
+          description: The export is over the email attachment limit. Narrow the period.
+        '404': *id002
+  /v1/reports/recipients:
+    get:
+      summary: The report allowlist
+      operationId: listReportRecipients
+      security:
+      - agentKey: []
+      description: 'Compliance role only: this is the list of who receives this firm''s dispute data.
+        Deactivated entries are listed too — "who could receive our disputes data in March" is a
+        question a supervisor is entitled to ask.'
+      responses:
+        '200':
+          description: Every recipient, active first.
+        '404': *id002
+    post:
+      summary: Register a report recipient
+      operationId: registerReportRecipient
+      security:
+      - agentKey: []
+      description: 'Compliance role only, and the more dangerous half of the pair — this is where it
+        is decided that a whole period may leave for a given address. A stated reason is required,
+        and the registration is audited against the acting agent.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address, label, reason]
+              properties:
+                address:
+                  type: string
+                  format: email
+                label:
+                  type: string
+                  description: What this recipient is, in your own words. Shown wherever the address is.
+                reason:
+                  type: string
+      responses:
+        '201':
+          description: Registered, or reactivated.
+        '200':
+          description: Already registered and active.
+        '400':
+          description: A missing field or an address that does not parse.
+        '404': *id002
+  /v1/reports/recipients/{recipient_id}:
+    delete:
+      summary: Deactivate a report recipient
+      operationId: deactivateReportRecipient
+      security:
+      - agentKey: []
+      description: Deactivates rather than deletes. Nothing here removes the record that an address
+        was once allowed to receive this firm's data.
+      parameters:
+      - name: recipient_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The deactivated recipient.
+        '404': *id002
   /v1/audit/verify:
     get:
       summary: Verify the audit chain

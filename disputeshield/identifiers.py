@@ -205,3 +205,7 @@ def generate_api_key(environment: str, kind: str = "secret") -> tuple[str, str]:
     body = secrets.token_urlsafe(32)
     full = f"pk_{environment}_{body}" if kind == "publishable" else f"ds_{environment}_{body}"
     return full, full[:16]
+
+
+def report_recipient_id() -> str:
+    return new_id("rcp")

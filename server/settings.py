@@ -77,6 +77,14 @@ REST_FRAMEWORK = {
     "URL_FORMAT_OVERRIDE": None,
 }
 
+# Development and CI never reach a provider. Under `manage.py test` / pytest,
+# Django swaps this for the in-memory backend, so `mail.outbox` is what a send
+# produces and no address in this repository is ever written to.
+EMAIL_BACKEND = os.environ.get(
+    "DISPUTESHIELD_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
+)
+DEFAULT_FROM_EMAIL = os.environ.get("DISPUTESHIELD_FROM_EMAIL", "no-reply@disputeshield.invalid")
+
 ROOT_URLCONF = "server.urls"
 WSGI_APPLICATION = "server.wsgi.application"
 ASGI_APPLICATION = "server.asgi.application"

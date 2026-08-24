@@ -15,7 +15,10 @@ from disputeshield.api.views_intake import IntakeView, WidgetDeflectionView
 from disputeshield.api.views_management import DisputeViewSet
 from disputeshield.api.views_reports import (
     AuditVerifyView,
+    RegulatoryReportEmailView,
     RegulatoryReportView,
+    ReportRecipientDetailView,
+    ReportRecipientView,
     SLAPerformanceView,
 )
 from disputeshield.api.views_widget import (
@@ -50,6 +53,17 @@ urlpatterns = [
     path("v1/widget/", include(widget_router.urls)),
     path("v1/analytics/sla-performance", SLAPerformanceView.as_view(), name="sla-performance"),
     path("v1/reports/regulatory", RegulatoryReportView.as_view(), name="regulatory-report"),
+    path(
+        "v1/reports/regulatory/email",
+        RegulatoryReportEmailView.as_view(),
+        name="regulatory-report-email",
+    ),
+    path("v1/reports/recipients", ReportRecipientView.as_view(), name="report-recipients"),
+    path(
+        "v1/reports/recipients/<str:recipient_id>",
+        ReportRecipientDetailView.as_view(),
+        name="report-recipient-detail",
+    ),
     path("v1/audit/verify", AuditVerifyView.as_view(), name="audit-verify"),
     path("v1/", include(router.urls)),
 ]
