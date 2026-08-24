@@ -48,6 +48,7 @@ from disputeshield.models.intelligence import (
     RootCauseCluster,
     Suggestion,
 )
+from disputeshield.models.keys import ImportBatch, SubjectKey
 from disputeshield.models.operations import (
     PolicySimulation,
     QaReview,
@@ -79,6 +80,7 @@ __all__ = [
     "ExternalEscalation",
     "Holiday",
     "IdempotencyRecord",
+    "ImportBatch",
     "InboundMessage",
     "Incident",
     "IncidentSubscription",
@@ -106,6 +108,7 @@ __all__ = [
     "SLAPolicyVersion",
     "SettlementConfirmation",
     "Status",
+    "SubjectKey",
     "Suggestion",
     "SweepHeartbeat",
     "Tenant",

@@ -193,6 +193,12 @@ jobs:
         # simulator produces is a confident wrong one.
         run: pytest tests/test_operations.py -q
 
+      - name: a shred leaves the chain verifying and the content unrecoverable
+        # Both halves. Either one alone is worthless — a shred that breaks the
+        # chain destroys the evidence; one that leaves content readable is not a
+        # shred. Also asserts a live tenant cannot carry a clock offset.
+        run: pytest tests/test_residency.py -q
+
       # Added in the phase that makes each one real:
       #   phase 4 — widget isolation in both directions
       #   phase 9 — no call path from any module to a payment write

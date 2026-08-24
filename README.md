@@ -488,7 +488,7 @@ Thirteen phases, each with an exit gate a machine checks.
 | 9 | The money side — representment packs, provider connectors, financial exposure | v1.3 |
 | 10 | Intelligence, strictly advisory — triage, copilot, root-cause clustering, repeat-claimant signals | v1.4 |
 | 11 | Operating the operation — SLA simulator, QA sampling, outbound webhooks | v1.5 |
-| 12 | Enterprise and adoption — residency and BYOK, migration tooling, sandbox and simulator | v2.0 |
+| 12 | Enterprise and adoption — residency and BYOK, migration tooling, sandbox and simulator | **v2.0 — shipped** |
 
 Phases 0–6 are a complete, shippable product. Nothing in 7–12 is a prerequisite
 for anything in them, so the cut line is obvious and lands somewhere defensible.

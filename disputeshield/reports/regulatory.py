@@ -24,10 +24,15 @@ import zipfile
 from datetime import datetime
 
 from disputeshield.audit.checkpoints import attestation, sign_payload
+from disputeshield.migration.importer import is_imported
 from disputeshield.models import AuditRecord, Dispute, SLAEvent
 
 CASE_COLUMNS = (
     "reference",
+    # A18: imported history stays distinguishable from native history, forever.
+    # A supervisor reading this bundle must be able to see which rows we
+    # witnessed and which we were handed.
+    "origin",
     "category",
     "subcategory",
     "status",
@@ -102,6 +107,13 @@ def build(*, tenant, period_from: datetime, period_to: datetime) -> Export:
         "period_from": period_from.isoformat(),
         "period_to": period_to.isoformat(),
         "case_count": len(cases),
+        "imported_case_count": sum(1 for case in cases if is_imported(case)),
+        "integrity_note": (
+            "Rows marked origin=imported were supplied by the firm from a prior "
+            "system. DisputeShield did not witness them and makes no integrity "
+            "claim about their content; the attestation below covers the records "
+            "DisputeShield itself created."
+        ),
         "breach_count": sum(1 for c in cases if c.breach_resolution or c.breach_ack),
         "files": digests,
         "integrity": attestation(tenant),
@@ -130,6 +142,7 @@ def _signable(body: dict) -> dict:
         "period_from": body["period_from"],
         "period_to": body["period_to"],
         "case_count": body["case_count"],
+        "imported_case_count": body["imported_case_count"],
         "breach_count": body["breach_count"],
         "files": body["files"],
     }
@@ -150,6 +163,7 @@ def _cases_csv(cases: list[Dispute]) -> bytes:
         writer.writerow(
             {
                 "reference": case.reference,
+                "origin": "imported" if is_imported(case) else "disputeshield",
                 "category": case.category,
                 "subcategory": case.subcategory,
                 "status": case.status,

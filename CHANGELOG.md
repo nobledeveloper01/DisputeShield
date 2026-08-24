@@ -7,7 +7,47 @@ All notable changes to this project are documented here. The format follows
 The PyPI package, the npm packages and the widget bundle are versioned together
 and released from one tag.
 
-## [Unreleased]
+## [2.0.0] — every amplifier delivered
+
+Phases 0–12 of `docs/ROADMAP.md`. The specification shipped at v1.0; the twenty
+capabilities in `docs/AMPLIFIERS.md` shipped across v1.1–v2.0, each with the
+guardrail that made it shippable.
+
+### Added — phase 12, enterprise and adoption (v2.0)
+
+Amplifiers **A20** residency, BYOK and crypto-shredding, **A18** migration
+tooling, **A19** sandbox and simulator.
+
+- **Crypto-shredding** resolves the tension §11.7 is honest about: seven-year
+  retention and a tested deletion procedure point in opposite directions, and an
+  append-only system cannot delete. Content is sealed under a per-subject key; a
+  shred destroys the key and **changes no row**, so the hash chain still verifies
+  while the content is permanently unrecoverable. Both halves are asserted
+  together, because either alone is worthless.
+- Sealing is **opt-in per tenant**, and the consequence is stated rather than
+  hidden: a tenant with sealing off can only be offered §11.7's refusal.
+- A shred requires two different people, is refused outright while a legal hold
+  covers the subject, and writes an audit record marked irreversible — the fact
+  that data was erased on a lawful request is itself something that must be
+  provable.
+- BYOK: a revoked master key renders exactly that tenant's content unreadable and
+  nobody else's, and we say so plainly rather than pretending to recover it.
+- Per-tenant `region` pinning, and subject keys that never cross a tenant.
+- CSV/Zendesk-shaped import with original timestamps. **Imported history stays
+  distinguishable from native history, forever**: clocks are stopped on creation
+  so a case closed in 2021 never acquires a deadline in 2026, every audit record
+  carries `disputeshield_witnessed: false`, and the regulatory export gains an
+  `origin` column plus an integrity note saying which rows we witnessed.
+- `disputeshield_simulate` builds a sandbox tenant containing a **breach, a
+  pause, a reopening and a mass incident** in one command — in 0.5s against the
+  roadmap's 60-second gate. A demo of the happy path demonstrates a ticketing
+  system.
+- The sandbox clock offset is **refused at the model layer** for a live tenant,
+  on `save()` as well as `clean()`, because the admin, a fixture, a data
+  migration and a management command all reach the model without a form in
+  between.
+
+### Tests — 578 fast, 11 wall-clock gates, 92% coverage
 
 ### Added — phase 11, operating the operation (v1.5)
 

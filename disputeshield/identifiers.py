@@ -171,6 +171,14 @@ def webhook_delivery_id() -> str:
     return new_id("whd")
 
 
+def subject_key_id() -> str:
+    return new_id("key")
+
+
+def import_batch_id() -> str:
+    return new_id("imp")
+
+
 def message_id() -> str:
     return new_id("msg")
 

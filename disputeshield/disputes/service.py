@@ -15,6 +15,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from disputeshield import audit
+from disputeshield.crypto import vault
 from disputeshield.disputes.states import TERMINAL, ClockEffect, find
 from disputeshield.identifiers import dispute_id
 from disputeshield.models import (
@@ -121,7 +122,9 @@ def file_dispute(
             customer_display_name=display_name,
             category=category,
             subcategory=subcategory,
-            description=description,
+            # Sealed under the subject's own key when the tenant has sealing on,
+            # which is what makes this content crypto-shreddable later (A20).
+            description=vault.seal(tenant, customer_ref_hash, description),
             transaction_ref=transaction_ref,
             amount_minor=amount_minor,
             currency=currency,
@@ -279,7 +282,7 @@ def add_message(
             author_type=author_type,
             author_id=author_id,
             visibility=visibility,
-            body=body,
+            body=vault.seal(dispute.tenant, dispute.customer_ref_hash, body),
         )
         audit.append(
             tenant=dispute.tenant,
@@ -302,6 +305,20 @@ def add_message(
             },
         )
         return message
+
+
+def readable_description(dispute: Dispute) -> str:
+    """The case description as a person should see it.
+
+    Returns the erasure marker for a shredded subject rather than raising, because
+    every caller that displays content needs to show something — and "erased under
+    a lawful request" is the true thing to show.
+    """
+    return vault.unseal(dispute.tenant, dispute.customer_ref_hash, dispute.description)
+
+
+def readable_body(message: DisputeMessage) -> str:
+    return vault.unseal(message.tenant, message.dispute.customer_ref_hash, message.body)
 
 
 def add_context(

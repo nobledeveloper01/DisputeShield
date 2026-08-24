@@ -470,6 +470,11 @@ easy ones" arrives in this phase, and the answer needs to have been decided befo
 
 **Review:** `/cso` full audit, `/devex-review` on the import path, `/document-release`.
 
+> **Status: complete.** The design that makes crypto-shredding possible is that
+> the chain hashes *what is stored* — ciphertext and metadata, never plaintext —
+> so destroying a key changes no row and nothing the chain covers moves. That
+> property was decided in phase 1 and cashed in here.
+
 ---
 
 ## Phase-to-amplifier index
@@ -496,6 +501,8 @@ easy ones" arrives in this phase, and the answer needs to have been decided befo
 | A18 | Migration and import tooling | 12 | v2.0 |
 | A19 | Sandbox, simulator, demo tenant | 12 | v2.0 |
 | A20 | Residency, BYOK, crypto-shredding | 12 | v2.0 |
+
+**All twelve phases are complete.** Every exit gate above runs in CI.
 
 ## The gates that never stop applying
 
