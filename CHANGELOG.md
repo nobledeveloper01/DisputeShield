@@ -9,6 +9,67 @@ and released from one tag.
 
 ## [Unreleased]
 
+### Added — phase 8, evidence that survives a lawyer (v1.2)
+
+Amplifiers **A7** legal hold, **A8** chain anchoring, **A6** external escalation,
+**A17** regulatory returns.
+
+- `LegalHold` over a case, a customer, a category or a period. It suspends every
+  retention and deletion process touching what it covers, including the
+  data-subject erasure path — §11.7 promises seven-year retention *and* a tested
+  deletion procedure, and the moment a case is in litigation those promises point
+  in opposite directions.
+- **Releasing a hold needs a second approver, and it must be a different person.**
+  A two-person rule one person can satisfy twice is a one-person rule with extra
+  steps.
+- `ErasureRequest`: a refusal is a recorded outcome with the words the requester
+  was given, stored verbatim in the audit trail. Refusing silently is its own
+  violation, and a refusal a supervisor cannot read back is one we cannot defend.
+- The retention sweep is **dry-run by default** and records every case it skipped
+  on hold — a case still present after its window needs a reason in the record
+  rather than looking like a sweep that missed it.
+- RFC 3161 anchoring of chain checkpoints, with a pluggable authority.
+  Unreachable means *pending*, not failed: writes continue, the backlog is
+  exported as `unanchored_total`, and recovery anchors it in order.
+- `GET /v1/audit/verify` now reports **three independent facts** — the chain is
+  consistent, we computed that, and somebody outside this system attests the
+  chain existed when we say it did. The development authority declares itself
+  non-external, so a local install can never let the API claim an attestation it
+  has not got.
+- `ExternalEscalation` with its own reference, the body's own clock, and its
+  correspondence kept on the case. **An open external track blocks closure in the
+  state machine** — internal case closed while the external one is live is
+  precisely what produces "the firm was unresponsive" in a supervisory finding.
+- A determination that contradicts the internal outcome is **surfaced, not
+  reconciled**. Rewriting ours to agree would destroy the most interesting
+  evidence in the case.
+- Versioned, data-driven `ReturnTemplate` with a **closed source registry**: a
+  template specifies what to count and cannot reach anything nobody decided to
+  publish. Returns are maker-checker, and the approved artefact's digest is
+  hashed into the chain — what is provable later is not that a return was
+  produced but that *this* one was approved.
+
+### Found during phase 8
+
+- **A foreign key into an append-only table cannot work.** Postgres enforces one
+  by taking a `FOR KEY SHARE` lock on the referenced row, and a row lock requires
+  UPDATE or DELETE privilege — exactly what migration 0014 revoked to make
+  checkpoints append-only. Every anchor insert failed with "permission denied".
+  `CheckpointAnchor` now holds a plain `checkpoint_id`; the integrity a foreign
+  key would buy is already a property of a parent that is immutable and never
+  deleted.
+
+### Tests — 421 fast, 9 wall-clock gates
+
+- `test_legal_hold.py` — every hold scope, the two-person release, the erasure
+  refusal for both reasons (hold and retention), and that releasing a hold
+  re-enters the case into the retention schedule.
+- `test_anchoring_and_escalation.py` — an unreachable authority does not block
+  filing, the backlog is a metric, recovery anchors it, and a local authority
+  never claims an external attestation. Plus: a return regenerates
+  byte-identically under a newer template revision, and generation has no path to
+  an approved status.
+
 ### Added — phase 7, every complaint lands in the clock (v1.1)
 
 Amplifiers **A1** omnichannel intake, **A2** deflection, **A3** mass-incident mode.

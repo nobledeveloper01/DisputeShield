@@ -329,6 +329,11 @@ looks like success.
 **Review:** `/cso`, plus a legal read of the hold and erasure interaction. This is the phase where
 being wrong is expensive in a way code review does not catch.
 
+> **Status: complete.** The gate that taught something: a foreign key *into* an
+> append-only table cannot be enforced, because Postgres locks the referenced row
+> and a row lock needs the UPDATE privilege the append-only design revokes. The
+> anchor table holds a plain reference instead.
+
 ---
 
 ## Phase 9 — The money side — **v1.3**

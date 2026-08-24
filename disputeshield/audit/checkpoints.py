@@ -129,11 +129,21 @@ def verify_signature(checkpoint: AuditCheckpoint) -> bool:
 
 
 def attestation(tenant) -> dict:
-    """What `GET /v1/audit/verify` and the regulatory export both publish."""
+    """What `GET /v1/audit/verify` and the regulatory export both publish.
+
+    Three facts, reported separately, because they answer three questions:
+    whether the records are internally consistent, whether we computed that, and
+    whether anybody outside this system agrees the chain existed when we say it
+    did. Collapsing them into one boolean is how the weakest becomes the headline.
+    """
+    from disputeshield.audit.anchoring import anchor_status
+
     result = verify_tenant(tenant.pk)
     latest = AuditCheckpoint.objects.order_by("-sequence_to").first()
+    anchor = anchor_status(tenant)
 
     return {
+        "anchor": anchor,
         "chain": {
             "verified": result.ok,
             "records_checked": result.records_checked,
@@ -148,12 +158,13 @@ def attestation(tenant) -> dict:
             "sequence_to": latest.sequence_to if latest else None,
             "head_hash": latest.head_hash if latest else None,
             "computed_at": latest.computed_at.isoformat() if latest else None,
-            # Stated plainly so nobody reads the weaker claim as the stronger one.
-            "externally_anchored": False,
+            # Read from the anchor block rather than hard-coded, and still
+            # stated plainly so nobody reads the weaker claim as the stronger one.
+            "externally_anchored": anchor["anchored"] and anchor["external"],
             "note": (
                 "The chain proves internal consistency. The signature proves we computed "
-                "it. Neither proves when the chain existed — external anchoring to a "
-                "timestamp authority is planned (amplifier A8)."
+                "it. Only an external anchor proves when the chain existed — see the "
+                "`anchor` block for whether one is present and whether it is external."
             ),
         },
     }

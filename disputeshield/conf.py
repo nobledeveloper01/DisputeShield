@@ -42,6 +42,9 @@ DEFAULTS: dict[str, Any] = {
     # files being served to agents.
     "AV_SCANNER": None,
     "NOTIFICATION_CHANNELS": {},
+    # No default. An installation that has not configured one accumulates a
+    # visible unanchored backlog rather than a false claim of attestation.
+    "TIMESTAMP_AUTHORITY": None,
     "STRICT_IMMUTABILITY": True,
     "ADVISORY_LOCK_NAMESPACE": 8_140_1,
 }

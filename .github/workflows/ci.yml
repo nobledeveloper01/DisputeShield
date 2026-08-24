@@ -168,6 +168,12 @@ jobs:
       - name: 5,000 cases resolve as 5,000 records with zero bulk updates
         run: pytest tests/test_mass_event_at_scale.py -q
 
+      - name: held material survives retention, and an erasure refusal is recorded
+        run: pytest tests/test_legal_hold.py -q
+
+      - name: anchoring degrades without stalling; an open external track blocks closure
+        run: pytest tests/test_anchoring_and_escalation.py -q
+
       # Added in the phase that makes each one real:
       #   phase 4 — widget isolation in both directions
       #   phase 9 — no call path from any module to a payment write

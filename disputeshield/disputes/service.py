@@ -15,7 +15,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from disputeshield import audit
-from disputeshield.disputes.states import ClockEffect, find
+from disputeshield.disputes.states import TERMINAL, ClockEffect, find
 from disputeshield.identifiers import dispute_id
 from disputeshield.models import (
     Agent,
@@ -32,6 +32,15 @@ REFERENCE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
 class ReasonRequired(ValueError):
     """A transition that changes what the firm owes the customer, unexplained."""
+
+
+class ExternalTrackOpen(RuntimeError):
+    """A case cannot close while a body outside the firm is still deciding it (A6).
+
+    That state — internal case closed, external one live — is precisely what
+    produces "the firm was unresponsive" in a supervisory finding. Enforced here,
+    in the transition, rather than in a convention a later endpoint can forget.
+    """
 
 
 class ActorNotPermitted(ValueError):
@@ -164,6 +173,20 @@ def transition(
         raise ActorNotPermitted(
             f"{rule.trigger} may be performed by {rule.actor_types}, not {actor_type!r}."
         )
+
+    if to in TERMINAL:
+        open_tracks = list(
+            dispute.escalations.filter(closed_at__isnull=True).values_list(
+                "body", "external_reference"
+            )
+        )
+        if open_tracks:
+            raise ExternalTrackOpen(
+                f"{dispute.reference} cannot be closed: "
+                + ", ".join(f"{body} {ref}" for body, ref in open_tracks)
+                + " is still open. Close the external track with the body's "
+                "determination first."
+            )
 
     with transaction.atomic():
         previous = dispute.status

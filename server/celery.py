@@ -48,6 +48,10 @@ app.conf.beat_schedule = {
         "task": "disputeshield.notifications.dispatch",
         "schedule": crontab(minute="*"),
     },
+    "disputeshield-audit-anchor": {
+        "task": "disputeshield.audit.anchor",
+        "schedule": crontab(minute="*/15"),
+    },
     "disputeshield-deadline-reconcile": {
         # ADR-0007: materialised deadlines must not drift from what
         # compute_deadline would produce. Nothing recomputes them implicitly, so

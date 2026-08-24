@@ -70,7 +70,7 @@ select = ["E", "F", "I", "UP", "B", "S", "DJ", "C4", "RUF"]
 ignore = ["S101"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S105", "S106"]
+"tests/*" = ["S105", "S106", "RUF012"]
 # RUF012 wants ClassVar on mutable class attributes. Django's Meta options,
 # `constraints`, `indexes` and a Migration's `operations` are all mutable class
 # attributes by framework design, and annotating them fights the framework

@@ -103,6 +103,30 @@ def contact_id() -> str:
     return new_id("con")
 
 
+def legal_hold_id() -> str:
+    return new_id("hld")
+
+
+def anchor_id() -> str:
+    return new_id("anc")
+
+
+def escalation_id() -> str:
+    return new_id("esc")
+
+
+def return_template_id() -> str:
+    return new_id("rtt")
+
+
+def regulatory_return_id() -> str:
+    return new_id("ret")
+
+
+def erasure_request_id() -> str:
+    return new_id("ers")
+
+
 def message_id() -> str:
     return new_id("msg")
 

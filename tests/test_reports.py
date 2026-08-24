@@ -209,16 +209,17 @@ class TestCheckpoints:
             assert first.checkpoint.pk == second.checkpoint.pk
             assert AuditCheckpoint.objects.count() == 1
 
-    def test_the_attestation_separates_the_two_claims(self, a_period_of_cases, as_tenant):
+    def test_the_attestation_separates_the_three_claims(self, a_period_of_cases, as_tenant):
         """The chain says nothing was altered. The signature says we computed
-        that. Neither says when the chain existed."""
+        that. The anchor says somebody outside this system agrees the chain
+        existed when we say it did. Collapsing them into one boolean is how the
+        weakest becomes the headline (phase 8 added the third)."""
         tenant, _ = a_period_of_cases
         with as_tenant(tenant):
             create_checkpoint(tenant)
             block = attestation(tenant)
-        assert set(block) == {"chain", "attestation"}
-        assert block["attestation"]["externally_anchored"] is False
-        assert "when" in block["attestation"]["note"]
+        assert set(block) == {"anchor", "chain", "attestation"}
+        assert "when the chain existed" in block["attestation"]["note"]
 
 
 class TestThroughTheApi:

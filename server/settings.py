@@ -132,6 +132,10 @@ DISPUTESHIELD_ATTACHMENT_ROOT = os.environ.get(
 )
 
 DISPUTESHIELD = {
+    "TIMESTAMP_AUTHORITY": os.environ.get(
+        "DISPUTESHIELD_TIMESTAMP_AUTHORITY",
+        "disputeshield.audit.anchoring.LocalAuthority",
+    ),
     "AV_SCANNER": os.environ.get(
         "DISPUTESHIELD_AV_SCANNER", "disputeshield.attachments.scanning.EicarScanner"
     ),
