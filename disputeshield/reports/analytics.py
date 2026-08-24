@@ -129,10 +129,21 @@ def summary(*, period_from: datetime, period_to: datetime) -> dict:
     )
     resolved = cases.filter(resolved_at__isnull=False)
 
+    from disputeshield.models import AuditRecord
+
     return {
         "cases": aggregate["total"] or 0,
         "breached": aggregate["breached"] or 0,
         "resolved": resolved.count(),
+        # §11.2, rendered beside case volume on purpose (amplifier A2): a drop in
+        # complaints during an outage must be visibly a deflection rather than
+        # silently a suppression. A feature that reduces recorded complaints has
+        # to be the most heavily instrumented thing in the product.
+        "deflected": AuditRecord.objects.filter(
+            event_type="intake.deflected",
+            occurred_at__gte=period_from,
+            occurred_at__lt=period_to,
+        ).count(),
         # Recorded, never executed (§3.3). This is a sum of what was promised,
         # and phase 9's exposure view is where it gets reconciled against what
         # the fintech's ledger says was paid.

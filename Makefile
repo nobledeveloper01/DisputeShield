@@ -46,8 +46,17 @@ lint:  ## Lint, format check, no-dangerous-html grep
 	scripts/no-dangerous-html.sh
 
 .PHONY: test
-test:  ## Full suite with the coverage gate
-	$(PY) -m pytest --cov=disputeshield --cov-fail-under=85
+test:  ## The suite with the coverage gate, minus the wall-clock gates
+	$(PY) -m pytest -m "not slow" --cov=disputeshield --cov-fail-under=85
+
+.PHONY: slow
+slow:  ## The wall-clock gates, each in its own session
+	@# Run separately because they are timing assertions. Sharing a session with
+	@# fixtures that build 35,000 rows means measuring autovacuum alongside the
+	@# queue, and a gate that cries wolf is one people re-run until it passes.
+	$(PY) -m pytest tests/test_queue_performance.py -q
+	$(PY) -m pytest tests/test_sweep_at_load.py -q
+	$(PY) -m pytest tests/test_mass_event_at_scale.py -q
 
 .PHONY: test-fast
 test-fast:  ## Everything except the slow suites
@@ -101,4 +110,4 @@ hello:  ## Empty database to a filed dispute with a computed deadline
 	scripts/hello-world.sh
 
 .PHONY: ci
-ci: lint migrations-check test gates security widget  ## Everything CI runs
+ci: lint migrations-check test gates slow security widget  ## Everything CI runs

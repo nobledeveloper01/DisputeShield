@@ -297,6 +297,11 @@ attacked, after the widget.
 on deflection before it is built, because it is the one feature here that can be wrong in a way that
 looks like success.
 
+> **Status: complete.** Every gate above runs in CI. The per-channel suite found a
+> bug the earlier phases had not: `file_dispute` started each clock against a
+> placeholder subject id, so `sla.started` was attributed to a subject that never
+> existed and every case's history was missing the event that began its clock.
+
 ---
 
 ## Phase 8 — Evidence that survives a lawyer — **v1.2**

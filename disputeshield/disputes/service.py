@@ -16,6 +16,7 @@ from django.utils import timezone
 
 from disputeshield import audit
 from disputeshield.disputes.states import ClockEffect, find
+from disputeshield.identifiers import dispute_id
 from disputeshield.models import (
     Agent,
     Dispute,
@@ -78,10 +79,19 @@ def file_dispute(
 
     submitted_at = submitted_at or timezone.now()
 
+    # The identifier is generated here rather than by the model default, so the
+    # clock can name the case it belongs to from its very first audit record.
+    # The earlier version started the clock with a placeholder subject and
+    # corrected it a moment later, which left `sla.started` attributed to a
+    # subject that never existed — so a case's history was missing the event that
+    # began its clock. `tests/test_intake.py` caught it by asserting that every
+    # channel produces an identical audit shape.
+    reference_id = dispute_id()
+
     with transaction.atomic():
         clock = clock_service.start(
             tenant=tenant,
-            subject_id="pending",
+            subject_id=reference_id,
             policy_version=policy_version,
             started_at=submitted_at,
             actor_type=actor_type,
@@ -95,6 +105,7 @@ def file_dispute(
         }
 
         dispute = Dispute.objects.create(
+            id=reference_id,
             tenant=tenant,
             reference=_reference(tenant),
             customer_ref_hash=customer_ref_hash,
@@ -111,11 +122,6 @@ def file_dispute(
             ack_deadline=deadlines[SLADeadline.Kind.ACKNOWLEDGEMENT],
             resolution_deadline=deadlines[SLADeadline.Kind.RESOLUTION],
         )
-
-        # The clock was created before the case had an id, because the deadlines
-        # it materialises are what the case stores. Point it back now.
-        clock.subject_id = dispute.pk
-        clock.save(update_fields=["subject_id"])
 
         audit.append(
             tenant=tenant,

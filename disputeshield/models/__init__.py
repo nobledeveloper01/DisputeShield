@@ -22,6 +22,19 @@ from disputeshield.models.dispute import (
     Status,
     hash_customer_ref,
 )
+from disputeshield.models.incidents import (
+    Incident,
+    IncidentSubscription,
+    MassEvent,
+    MassEventMembership,
+)
+from disputeshield.models.intake import (
+    Channel,
+    DisputeContact,
+    InboundMessage,
+    IngestAddress,
+    hash_identity,
+)
 from disputeshield.models.policy import SLAPolicy, SLAPolicyVersion
 from disputeshield.models.tenant import Tenant
 from disputeshield.models.widget import AllowedOrigin, WidgetConfig, validate_origin
@@ -34,11 +47,19 @@ __all__ = [
     "AuditRecord",
     "BusinessCalendar",
     "BusinessHoursWindow",
+    "Channel",
     "Dispute",
     "DisputeAttachment",
+    "DisputeContact",
     "DisputeMessage",
     "Holiday",
     "IdempotencyRecord",
+    "InboundMessage",
+    "Incident",
+    "IncidentSubscription",
+    "IngestAddress",
+    "MassEvent",
+    "MassEventMembership",
     "NotificationOutbox",
     "Outcome",
     "ResponseTemplate",
@@ -53,5 +74,6 @@ __all__ = [
     "TransactionContext",
     "WidgetConfig",
     "hash_customer_ref",
+    "hash_identity",
     "validate_origin",
 ]

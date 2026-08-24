@@ -65,7 +65,11 @@ jobs:
       - run: python manage.py migrate --no-input
       - run: python manage.py makemigrations --check --dry-run
       - run: python manage.py disputeshield_doctor --strict
-      - run: pytest --cov=disputeshield --cov-fail-under=85
+      # `-m "not slow"` on purpose. The wall-clock gates each run in their own
+      # session in the `gates` job below, where the number means something. Run
+      # inside a 390-test session they measure the database's background work
+      # after 35,000 fixture rows as much as they measure the queue.
+      - run: pytest -m "not slow" --cov=disputeshield --cov-fail-under=85
 
   gates:
     # The blocking gates, run separately so a failure is unmissable in the checks
@@ -154,6 +158,15 @@ jobs:
 
       - name: the sweep clears 10,000 due deadlines inside 60s (§11.9)
         run: pytest tests/test_sweep_at_load.py -q
+
+      - name: every channel lands in the same clock, and a stranger is quarantined
+        run: pytest tests/test_intake.py -q
+
+      - name: deflection cannot be configured away, and a fan-out stays individual
+        run: pytest tests/test_deflection_and_mass_events.py -q
+
+      - name: 5,000 cases resolve as 5,000 records with zero bulk updates
+        run: pytest tests/test_mass_event_at_scale.py -q
 
       # Added in the phase that makes each one real:
       #   phase 4 — widget isolation in both directions

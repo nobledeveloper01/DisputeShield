@@ -79,6 +79,30 @@ def checkpoint_id() -> str:
     return new_id("ckp")
 
 
+def ingest_address_id() -> str:
+    return new_id("ing")
+
+
+def inbound_message_id() -> str:
+    return new_id("inb")
+
+
+def incident_id() -> str:
+    return new_id("inc")
+
+
+def mass_event_id() -> str:
+    return new_id("mev")
+
+
+def membership_id() -> str:
+    return new_id("mem")
+
+
+def contact_id() -> str:
+    return new_id("con")
+
+
 def message_id() -> str:
     return new_id("msg")
 

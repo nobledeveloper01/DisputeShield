@@ -7,6 +7,73 @@ All notable changes to this project are documented here. The format follows
 The PyPI package, the npm packages and the widget bundle are versioned together
 and released from one tag.
 
+## [Unreleased]
+
+### Added — phase 7, every complaint lands in the clock (v1.1)
+
+Amplifiers **A1** omnichannel intake, **A2** deflection, **A3** mass-incident mode.
+
+- Six inbound channels — email, WhatsApp, USSD, phone call logs, social DMs and
+  web forms — each with its own adapter and one shape afterwards. §2.1's actual
+  problem is that complaints arrive through six channels and end up in a shared
+  inbox; the widget solved one of them.
+- `DisputeContact`: the identity a case may receive messages from, per channel.
+  **Channel identity never grants case access on its own** — a message from
+  anyone else is quarantined for a human to attribute, never appended and never
+  echoed back into the thread.
+- Thread matching on the email thread root rather than the subject line, on the
+  envelope `From` rather than the display name, and on a normalised phone number
+  so `+234 801 234 5678` and `2348012345678` are one customer.
+- Auto-replies and bounces are ignored rather than appended. Treating an
+  out-of-office as a customer's response would resume a paused clock on the
+  strength of a mail server's holiday message.
+- `router.attribute` — a human resolving a quarantine also verifies the sender,
+  so the next message in that thread lands without a human. A review queue should
+  shrink as it is worked.
+- Deflection: declared incidents, narrow matchers, and a "notify me"
+  subscription. `file_anyway` is a **module constant**, not a setting, not a
+  column and not a serializer field — a boolean a tenant can set to False during
+  an outage is one that will be set to False during an outage, and complaint
+  suppression is the worst accusation a regulator can make about a complaints
+  system.
+- `deflections_total` from the audit trail rather than a counter, and rendered
+  beside case volume in the analytics summary — a feature that reduces recorded
+  complaints has to be the most instrumented thing in the product.
+- `MassEvent` with per-case membership: one investigation, one finding, and a
+  fan-out that writes each case individually. Membership is closed rather than
+  deleted, because that a case was once grouped with four thousand others is part
+  of how it was handled.
+- `POST /v1/intake/{channel}` and `POST /v1/widget/deflection`.
+
+### Fixed — during phase 7
+
+- **A case's clock-start event was attributed to a subject that never existed.**
+  `file_dispute` created the clock with a placeholder `subject_id` and corrected
+  it a moment later, so `sla.started` pointed at `"pending"` — leaving every
+  case's history missing the event that began its clock, and the regulatory
+  export short one row per case. The identifier is now generated before the
+  clock, so the first audit record names the case. Caught by the parameterised
+  per-channel suite asserting an identical audit shape.
+- **The 5,000-case gate was inspecting only the last 9,000 statements.** Django
+  caps the query log and warns; the deque is sized at connection setup, so
+  raising `queries_limit` alone does nothing. A bulk `UPDATE` in the first batch
+  would have passed a gate written to forbid it.
+
+### Tests — 384 Python
+
+- `test_intake.py` — the per-channel suite is parameterised over every inbound
+  channel and asserts an identical clock, an identical audit shape, identical
+  isolation and a hashed identity. The quarantine cases are individual: a
+  different address, a **spoofed display name**, a **rewritten `Reply-To`**, and
+  a quoted case reference — which appears in every email we send and must not act
+  like a secret.
+- `test_deflection_and_mass_events.py` — the file-anyway guardrail is asserted
+  against the *shape of the code*: not a settings key, not a model field, a
+  module constant.
+- `test_mass_event_at_scale.py` — 5,000 cases resolve as 5,000 individual audit
+  records with zero bulk `UPDATE`s, asserted by reading the SQL, and the chain
+  still verifies afterwards.
+
 ## [1.0.0] — the specification, delivered
 
 Phases 0–6 of `docs/ROADMAP.md`. Everything §13 claims survives follow-up
