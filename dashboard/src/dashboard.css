@@ -1,0 +1,203 @@
+/* Operations console (DESIGN.md). Sober, dense, legible at the end of a shift.
+   No gradients, no card shadows, no cheerful accent on every button.
+
+   The load-bearing rule on this surface: **colour is reserved for time.** The
+   navigation, the buttons, the links and the recipients table are monochrome.
+   The only saturated pixels belong to `.ds-state-*`, and each of those is
+   reporting a regulatory deadline that was missed or is about to be. */
+
+:root {
+  /* Ink, not brand. */
+  --ds-ink: #16161a;
+  --ds-muted: #5c5f66;
+  --ds-line: #d8d8d6;
+  --ds-bg: #fff;
+  --ds-raised: #f7f7f5;
+
+  /* The only colour in the file, and it is a clock. */
+  --ds-breached: #b42318;
+  --ds-breached-ink: #fff;
+  --ds-warning: #b54708;
+  --ds-notice: #f2eee4;
+
+  --ds-space: 8px;
+  --ds-row: 44px;
+
+  /* Instrument Serif and Geist are the specified families. They are declared
+     here with honest fallbacks rather than fetched from a third-party origin: a
+     console that degrades when a font CDN is slow is one thing, and a console
+     that phones out to one during an incident is another. Self-hosting the two
+     files is a deployment step, not a runtime dependency. */
+  --ds-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --ds-ui: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 14px/1.5 var(--ds-ui);
+  color: var(--ds-ink);
+  background: var(--ds-bg);
+}
+
+.ds-app {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: calc(var(--ds-space) * 4) calc(var(--ds-space) * 3);
+  display: grid;
+  gap: calc(var(--ds-space) * 5);
+}
+
+.ds-app-header { display: grid; gap: var(--ds-space); }
+
+/* Instrument Serif at 24px and above only — below that it loses both its
+   argument and its legibility. */
+.ds-h1 { font: 400 32px/1.2 var(--ds-display); margin: 0; }
+.ds-h2 { font: 400 24px/1.2 var(--ds-display); margin: 0 0 var(--ds-space); }
+.ds-h3 { font: 600 14px/1.4 var(--ds-ui); margin: 0 0 4px; }
+
+.ds-lede { color: var(--ds-muted); margin: 0 0 calc(var(--ds-space) * 2); max-width: 66ch; }
+.ds-note { color: var(--ds-muted); font-size: 13px; margin: 2px 0 0; display: block; }
+.ds-help { color: var(--ds-muted); font-size: 12px; margin: 4px 0 0; max-width: 60ch; }
+.ds-empty { color: var(--ds-muted); padding: calc(var(--ds-space) * 2); }
+
+/* Tabular figures are non-negotiable: a column of dates or counts whose digits
+   do not align is a column somebody misreads. */
+.ds-num, .ds-mono { font-variant-numeric: tabular-nums; }
+.ds-mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; }
+
+.ds-table { width: 100%; border-collapse: collapse; }
+.ds-table th {
+  text-align: left;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ds-muted);
+  font-weight: 600;
+  padding: var(--ds-space);
+  border-bottom: 1px solid var(--ds-line);
+}
+.ds-table td {
+  padding: var(--ds-space);
+  border-bottom: 1px solid var(--ds-line);
+  height: var(--ds-row);
+  vertical-align: top;
+}
+.ds-row-inactive td { color: var(--ds-muted); }
+
+.ds-schedules { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ds-space); }
+.ds-schedule {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: calc(var(--ds-space) * 2);
+  align-items: start;
+  padding: calc(var(--ds-space) * 1.5);
+  border: 1px solid var(--ds-line);
+  /* No radius, no shadow. This is a record, not a card. */
+}
+.ds-state-label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* --- the only colour in the product, and all of it is time ---------------- */
+
+/* Breached: solid fill, highest contrast available. A monthly return that did
+   not go out and will not be retried. */
+.ds-state-failed { border-color: var(--ds-breached); border-left-width: 4px; }
+.ds-state-failed .ds-state-label {
+  background: var(--ds-breached);
+  color: var(--ds-breached-ink);
+  padding: 2px 6px;
+  display: inline-block;
+}
+
+/* Saturated, static. Owed for longer than the grace window. */
+.ds-state-overdue { border-color: var(--ds-warning); border-left-width: 4px; }
+.ds-state-overdue .ds-state-label { color: var(--ds-warning); }
+
+/* Muted tint. Owed and recently due is the normal state for a few hours. */
+.ds-state-owed { background: var(--ds-notice); }
+
+/* Desaturated with a visible hatch. DESIGN.md is explicit that a paused clock
+   must never read as a comfortable one — including when what was paused is the
+   schedule itself. */
+.ds-state-paused {
+  color: var(--ds-muted);
+  background-image: repeating-linear-gradient(
+    45deg, transparent, transparent 6px, var(--ds-raised) 6px, var(--ds-raised) 12px
+  );
+}
+
+/* Comfortable: no colour at all. Declared so the intent is explicit rather than
+   an omission somebody later "fixes". */
+.ds-state-current { background: var(--ds-bg); }
+
+/* --- forms and controls, all monochrome ---------------------------------- */
+
+.ds-form {
+  display: grid;
+  gap: calc(var(--ds-space) * 2);
+  margin-top: calc(var(--ds-space) * 3);
+  padding-top: calc(var(--ds-space) * 3);
+  border-top: 1px solid var(--ds-line);
+  max-width: 640px;
+}
+.ds-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--ds-space) * 2); }
+.ds-field { display: grid; gap: 4px; }
+.ds-field label { font-weight: 600; font-size: 13px; }
+.ds-input {
+  font: inherit;
+  padding: var(--ds-space);
+  border: 1px solid var(--ds-line);
+  background: var(--ds-bg);
+  color: var(--ds-ink);
+}
+.ds-fieldset { border: 1px solid var(--ds-line); padding: calc(var(--ds-space) * 1.5); display: grid; gap: 4px; }
+.ds-fieldset legend { font-weight: 600; font-size: 13px; padding: 0 4px; }
+.ds-check { display: flex; align-items: center; gap: var(--ds-space); min-height: 32px; }
+
+.ds-button {
+  font: inherit;
+  padding: var(--ds-space) calc(var(--ds-space) * 1.5);
+  border: 1px solid var(--ds-line);
+  background: var(--ds-bg);
+  color: var(--ds-ink);
+  cursor: pointer;
+  /* Under 150ms or not at all. */
+  transition: background 120ms ease;
+}
+.ds-button:hover:not(:disabled) { background: var(--ds-raised); }
+.ds-button:disabled { color: var(--ds-muted); cursor: default; }
+/* The primary button is ink, not an accent colour. Colour is for time. */
+.ds-button-primary { background: var(--ds-ink); color: var(--ds-bg); border-color: var(--ds-ink); }
+.ds-button-primary:hover:not(:disabled) { background: #000; }
+.ds-actions { display: flex; gap: var(--ds-space); }
+
+/* A visible focus ring everywhere, in ink. Keyboard operability is a regulatory
+   obligation here (§9), not a preference. */
+:focus-visible { outline: 2px solid var(--ds-ink); outline-offset: 2px; }
+
+.ds-error {
+  margin: 0;
+  padding: var(--ds-space);
+  border-left: 4px solid var(--ds-breached);
+  background: var(--ds-raised);
+}
+
+.ds-visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

@@ -374,6 +374,63 @@ class TestThroughTheApi:
         )
         assert response.status_code == 404
 
+    def test_the_derived_state_the_dashboard_renders_comes_from_the_server(
+        self, a_scheduled_tenant, compliance_client
+    ):
+        """`periods_owed` and `is_overdue` are computed by the same code the
+        runner uses.
+
+        A second implementation of the month arithmetic in the dashboard would
+        eventually disagree with the one that actually sends the mail, and a
+        dashboard saying a schedule is healthy while the runner thinks a month is
+        owed is worse than no dashboard.
+        """
+        tenant, schedule = a_scheduled_tenant
+
+        listed = compliance_client(tenant).get("/v1/reports/schedules").json()["data"]
+        target = next(s for s in listed if s["id"] == schedule.pk)
+
+        # The fixture's schedule was created in March 2026 and has delivered
+        # nothing, so by now it owes months and is long past the grace window.
+        assert target["periods_owed"], "the runner would find months owed"
+        assert target["is_overdue"] is True
+        assert target["last_period_delivered"] is None
+
+    def test_an_inactive_schedule_owes_nothing(
+        self, a_scheduled_tenant, compliance_client, as_tenant
+    ):
+        """A deactivated schedule is not behind; it is stopped.
+
+        Reporting it as overdue would put a permanent alarm on the dashboard for
+        a schedule somebody deliberately switched off.
+        """
+        tenant, schedule = a_scheduled_tenant
+        with as_tenant(tenant):
+            ReportSchedule.objects.filter(pk=schedule.pk).update(is_active=False)
+
+        listed = compliance_client(tenant).get("/v1/reports/schedules").json()["data"]
+        target = next(s for s in listed if s["id"] == schedule.pk)
+
+        assert target["periods_owed"] == []
+        assert target["is_overdue"] is False
+        assert target["is_active"] is False
+
+    def test_a_new_schedule_owes_nothing_yet(self, a_scheduled_tenant, compliance_client):
+        """Its first period is the month it was created in, which has not closed."""
+        tenant, _schedule = a_scheduled_tenant
+        created = (
+            compliance_client(tenant)
+            .post(
+                "/v1/reports/schedules",
+                {"name": "Fresh", "recipients": [ALLOWED], "reason": "New arrangement."},
+                format="json",
+            )
+            .json()
+        )
+
+        assert created["periods_owed"] == []
+        assert created["is_overdue"] is False
+
     def test_failed_periods_are_surfaced_not_buried(
         self, a_scheduled_tenant, compliance_client, as_tenant
     ):

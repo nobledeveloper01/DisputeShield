@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -55,6 +55,11 @@ class SLAPerformanceView(PeriodMixin, APIView):
 
 
 FORMATS = frozenset({"zip", "json", "pdf", "csv"})
+
+# Matches the doctor's window. A schedule owes its month the moment the month
+# closes and the due hour passes; owing it for longer than this means nothing is
+# calling the runner, which is a different problem with a different fix.
+OVERDUE_GRACE = timedelta(days=2)
 
 
 class RegulatoryReportView(PeriodMixin, APIView):
@@ -368,7 +373,21 @@ class ReportScheduleDetailView(PeriodMixin, APIView):
 
 
 def _schedule(schedule: ReportSchedule) -> dict:
+    """The schedule, plus the derived state the dashboard renders.
+
+    `periods_owed` and `is_overdue` are computed here, by the same code the
+    runner uses, rather than left to the client. The month arithmetic is subtle
+    — closed months, the schedule's own timezone, a due date in the month after
+    the period — and a second implementation in JavaScript would eventually
+    disagree with the one that actually sends the mail. A dashboard that says a
+    schedule is healthy while the runner thinks a month is owed is worse than no
+    dashboard.
+    """
     from disputeshield.reports import schedules as scheduling
+
+    owed = scheduling.periods_owed(schedule, now=timezone.now()) if schedule.is_active else []
+    overdue_cutoff = timezone.now() - OVERDUE_GRACE
+    overdue = bool(schedule.is_active and scheduling.periods_owed(schedule, now=overdue_cutoff))
 
     return {
         "id": schedule.pk,
@@ -392,6 +411,10 @@ def _schedule(schedule: ReportSchedule) -> dict:
         # Surfaced, not buried. A month that could not be delivered is the single
         # most important thing this endpoint can tell a compliance officer.
         "failed_periods": schedule.failed_periods,
+        "periods_owed": [month.isoformat() for month in owed],
+        # Owed is normal for a few hours after a period closes. Owed for longer
+        # than the grace window means nothing is running the schedule.
+        "is_overdue": overdue,
     }
 
 

@@ -11,6 +11,37 @@ and released from one tag.
 
 ### Added
 
+- **The dashboard's first surface: report delivery** (`dashboard/`). The
+  allowlist and the schedules on one screen, because splitting them would let
+  somebody create a schedule without seeing that the address it points at was
+  deactivated last month.
+- **A schedule's health is rendered as a deadline state**, which is how it earns
+  colour under DESIGN.md's rule rather than in spite of it: a monthly regulatory
+  return that did not go out *is* a missed deadline. Abandoned months take the
+  breached treatment and are pinned to the top, an overdue schedule is saturated,
+  a month recently due is a muted tint, and a schedule that is up to date has no
+  colour at all. A deactivated schedule takes the paused treatment, hatch
+  included, because a stopped clock must never read as a comfortable one. The
+  recipients table has no colour anywhere; nothing on it is about a deadline.
+- **Colour is never the only encoding.** Every state carries a text label and a
+  position in the sort order, asserted in the browser suite by finding the labels
+  rather than by inspecting CSS — which would pass if the label were rendered
+  invisibly.
+- The screen leads with `last_period_delivered`, the last month **confirmed
+  delivered**, not a "last run" timestamp. The distinction is the whole point of
+  the scheduler's design, and showing a run time is exactly the figure that lets
+  a schedule delivering nothing look healthy.
+- `periods_owed` and `is_overdue` are **computed server-side**, by the same code
+  the runner uses. The month arithmetic is subtle — closed months, the schedule's
+  own timezone, a due date in the month after the period — and a second
+  implementation in JavaScript would eventually disagree with the one that sends
+  the mail. An inactive schedule owes nothing and is never overdue: it is
+  stopped, not behind.
+- Ten browser gates in CI: WCAG 2.1 AA via axe with **every health state on
+  screen** (a run against only the healthy case would never render the states
+  where contrast and non-colour encoding matter), a keyboard-only path through
+  both flows, and an assertion that each of the eight "Deactivate" buttons names
+  what it deactivates. Seven unit tests cover the health rules themselves.
 - **Scheduled monthly delivery** — `POST /v1/reports/schedules`, compliance-only,
   with an hourly runner (`disputeshield.reports.run_schedules`) and
   `disputeshield_run_report_schedules` for catching up by hand.
@@ -134,6 +165,13 @@ and released from one tag.
 
 ### Fixed
 
+- **`scripts/no-dangerous-html.sh` scanned build output.** React's own minified
+  internals contain every string it greps for, so running it on a built tree
+  reported a failure that blamed a library and could not be fixed. It passed in
+  CI only because that job happens to run before anything is built — but a gate
+  that fires on a developer's machine after a routine `npm run build` is a gate
+  people learn to ignore, and then it protects nothing. It now reads source
+  directories only, and was checked to still fail on a real sink.
 - **A closed period did not export identically twice, once the PDF existed.** The
   cover page printed the tenant's live audit-chain head and its running record
   count — statements about the system *now*, rendered into digest-covered bytes —

@@ -23,4 +23,6 @@ CLAUDE.md
 static/widget/
 widget/test-results/
 widget/playwright-report/
+dashboard/test-results/
+dashboard/playwright-report/
 .private/

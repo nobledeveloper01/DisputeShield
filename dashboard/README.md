@@ -16,7 +16,44 @@ Roles are Owner, Compliance, Agent and Read-only. An agent can resolve a case bu
 cannot change an SLA policy; a compliance user can change a policy, and the change
 is recorded, versioned and rendered next to the breach data it affects.
 
-Queue and case view land in phase 3; analytics and reports in phase 6.
+**Built so far:** report delivery — the recipient allowlist and the monthly
+schedules (`src/reports/`). Queue, case view and breach analysis are still to
+come.
+
+## Running it
+
+```bash
+npm install && npm run dev     # against a local API on the same origin
+npm test                       # the schedule-health rules
+npm run test:e2e               # keyboard and axe, against a stubbed API
+```
+
+The browser suite stubs the API deliberately. Those tests exist to assert that a
+keyboard-only compliance officer can operate the surface and that it has no WCAG
+AA violations; neither needs a database, and a suite slow enough to skip is an
+accessibility gate that has stopped being one. The API contract underneath is
+covered by the Python suite, through real authentication, roles and RLS.
+
+## Where the derived state comes from
+
+A schedule's health — which months are owed, whether it is overdue — is computed
+by the **server**, by the same code the runner uses, and rendered here. The month
+arithmetic is subtle (closed months, the schedule's own timezone, a due date in
+the month after the period) and a second implementation in JavaScript would
+eventually disagree with the one that actually sends the mail. A dashboard that
+says a schedule is healthy while the runner thinks a month is owed is worse than
+no dashboard.
 
 Read `DESIGN.md` first. The rule that governs this surface: **colour is reserved
 for time.** A healthy queue is monochrome.
+
+How that applies to report delivery, since it is not obviously a queue: a monthly
+regulatory return that did not go out **is** a missed deadline, so a schedule's
+health is rendered on the same scale a case's clock is — abandoned months take
+the breached treatment and are pinned to the top, an overdue schedule is
+saturated, a month recently due is a muted tint, and a schedule that is up to
+date has no colour at all. A deactivated schedule takes the paused treatment,
+hatch included, because DESIGN.md is explicit that a stopped clock must never
+read as a comfortable one.
+
+The recipients table has no colour anywhere. Nothing on it is about a deadline.

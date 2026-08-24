@@ -257,6 +257,11 @@ jobs:
       - run: npm ci --prefix widget
       - run: npm run build --prefix widget
 
+      - run: npm ci --prefix dashboard
+      - run: npm run build --prefix dashboard
+      - name: the dashboard's schedule-health rules
+        run: npm test --prefix dashboard
+
   browser:
     # The gates that need a real browser and a real second origin. Split from
     # `frontend` because it needs the whole stack up, and a slow job that only
@@ -307,11 +312,19 @@ jobs:
         env:
           DISPUTESHIELD_ALLOWED_HOSTS: localhost,127.0.0.1,testserver
 
+      - run: npm ci --prefix dashboard && npm run build --prefix dashboard
+      - name: the dashboard is operable by keyboard and free of WCAG AA violations
+        # §9 makes accessibility a regulatory obligation. A compliance officer who
+        # cannot operate this screen cannot prove what the firm did.
+        run: npm run test:e2e --prefix dashboard
+
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: playwright-traces
-          path: widget/test-results/
+          path: |
+            widget/test-results/
+            dashboard/test-results/
 
   packaging:
     # §6.2 is a distribution promise, and it is only true if it is tested as one:

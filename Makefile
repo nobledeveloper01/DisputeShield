@@ -85,10 +85,16 @@ widget:  ## Build the loader and the widget, and publish the bundle
 	scripts/check-loader-size.sh
 	npm test --prefix loader
 
+.PHONY: dashboard
+dashboard:  ## Build the dashboard and run its unit tests
+	npm ci --prefix dashboard && npm run build --prefix dashboard
+	npm test --prefix dashboard
+
 .PHONY: browser
-browser: widget  ## Isolation, keyboard and axe gates in a real browser
+browser: widget dashboard  ## Isolation, keyboard and axe gates in a real browser
 	npx --prefix widget playwright install chromium
 	npm run test:e2e --prefix widget
+	npm run test:e2e --prefix dashboard
 	$(MAKE) stop-servers
 
 .PHONY: stop-servers
@@ -98,6 +104,7 @@ stop-servers:  ## Stop servers Playwright left running
 	@# during the p95 gate and it fails for reasons that have nothing to do with
 	@# the code. This has happened three times; hence the target.
 	@pkill -f "manage.py runserver 127.0.0.1:8011" 2>/dev/null || true
+	@pkill -f "vite preview --port 4190" 2>/dev/null || true
 	@pkill -f "tests/serve-host.mjs" 2>/dev/null || true
 	@echo "stopped any lingering test servers"
 

@@ -1047,7 +1047,10 @@ paths:
         exports a year and delivers none cannot look healthy here. `failed_periods` lists months that
         could not be delivered after the maximum attempts and were stepped over; stepping over is
         deliberate, because blocking every future month behind one stuck month turns a single bad
-        period into a total, silent outage.'
+        period into a total, silent outage. `periods_owed` and `is_overdue` are derived server-side by
+        the same code the runner uses, so a client cannot reach a different conclusion about a month
+        than the process that sends the mail. An inactive schedule owes nothing and is never overdue —
+        it is stopped, not behind.'
       responses:
         '200':
           description: Every schedule, active first.
