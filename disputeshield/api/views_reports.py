@@ -46,6 +46,9 @@ class SLAPerformanceView(PeriodMixin, APIView):
         )
 
 
+FORMATS = frozenset({"zip", "json", "pdf", "csv"})
+
+
 class RegulatoryReportView(PeriodMixin, APIView):
     """§6.5. Compliance-only: an export is a disclosure of the whole period."""
 
@@ -57,13 +60,42 @@ class RegulatoryReportView(PeriodMixin, APIView):
             tenant=request.user.tenant, period_from=period_from, period_to=period_to
         )
 
-        if request.query_params.get("format", "zip") == "json":
+        requested = request.query_params.get("format", "zip")
+        if requested not in FORMATS:
+            # An unrecognised format used to fall through to the zip, which meant
+            # a typo returned a whole period's disclosure in a shape the caller
+            # never asked for and would not notice was wrong.
+            return Response(
+                {
+                    "error": {
+                        "type": "invalid_request",
+                        "message": f"Unknown format {requested!r}. "
+                        f"Expected one of: {', '.join(sorted(FORMATS))}.",
+                    }
+                },
+                status=400,
+            )
+        stem = f"disputeshield-{period_from.date()}-{period_to.date()}"
+
+        if requested == "json":
             return Response(export.manifest)
 
+        if requested == "pdf":
+            # §7.3's `format=pdf`. The document a supervisor reads; the CSVs in
+            # the zip are what their systems ingest.
+            response = HttpResponse(export.files["report.pdf"], content_type="application/pdf")
+            response["Content-Disposition"] = f'attachment; filename="{stem}.pdf"'
+            response["Cache-Control"] = "private, no-store"
+            return response
+
+        if requested == "csv":
+            response = HttpResponse(export.files["cases.csv"], content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename="{stem}-cases.csv"'
+            response["Cache-Control"] = "private, no-store"
+            return response
+
         response = HttpResponse(export.as_zip(), content_type="application/zip")
-        response["Content-Disposition"] = (
-            f'attachment; filename="disputeshield-{period_from.date()}-{period_to.date()}.zip"'
-        )
+        response["Content-Disposition"] = f'attachment; filename="{stem}.zip"'
         response["Cache-Control"] = "private, no-store"
         return response
 

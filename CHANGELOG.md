@@ -7,6 +7,67 @@ All notable changes to this project are documented here. The format follows
 The PyPI package, the npm packages and the widget bundle are versioned together
 and released from one tag.
 
+## [Unreleased]
+
+### Added
+
+- **`format=pdf` on the regulatory export (§7.3).** The specification has always
+  listed `csv|pdf`; only the CSVs shipped. The PDF is the document a supervisor
+  reads — cover attestation, period summary, the complaints table, then per-case
+  history — while the CSVs stay what their systems ingest. It is built from the
+  export that was already assembled rather than from a second query, so the
+  readable document and the machine-readable one cannot describe two different
+  reads of the period.
+- The PDF carries the **same byte-reproducibility gate** as the rest of the
+  bundle. PDFs make that harder than CSVs: a creation date, a modification date
+  and a document ID are all regenerated per build. `invariant=1` pins the three,
+  and page streams are left **uncompressed** on purpose — zlib's output is
+  deterministic for a given build of zlib but not guaranteed across versions, so
+  compressing would make reproducibility depend on which machine rendered the
+  file. It also leaves the document greppable, which for an artefact a supervisor
+  may examine is a feature.
+- `report.pdf` is listed in the signed manifest alongside the CSVs, so the
+  document is covered by the same signature and a tampered copy is detectable.
+- The cover page states what the integrity attestation **does not** prove, and a
+  failed chain appears on page one rather than being quietly omitted. A
+  regulator-ready artefact that overclaims is worse than one that says nothing.
+- There is deliberately **no way to build the bundle without the PDF**, tempting
+  as that is for `format=json`, which never reads it. A period has exactly one
+  manifest; omitting a file would sign a different list, and a supervisor
+  comparing the manifest they fetched as JSON against the one inside the zip
+  would find two signatures for the same period and no way to tell which is
+  authoritative. Rendering a document nobody reads is the cheaper mistake.
+- Long periods are **abridged, and say so**: per-case history is rendered for the
+  first 200 cases, with an explicit statement that nothing was discarded and that
+  the complete history is in `history.csv`.
+
+### Fixed
+
+- **`?format=pdf` and `?format=csv` answered 404 before the view ran.** DRF
+  reserves the `format` query parameter to select a renderer by name and raises
+  `NotFound` for one it does not recognise, so two of the four formats §7.3
+  documents were unreachable. `?format=json` appeared to work only because DRF
+  happens to have a renderer by that name — the endpoint looked correct from the
+  one format anybody had tried. `URL_FORMAT_OVERRIDE` is now disabled and the
+  parameter belongs to the views that document it.
+- An unrecognised `format` now answers **400** instead of falling through to the
+  zip. A typo used to return a whole period's disclosure in a shape the caller
+  never asked for, with nothing to indicate it.
+- **The grounding gate could be satisfied by a coincidence.** An amount claim was
+  compared by stripping every non-digit from the joined sources into one long
+  string and searching it for the claim's digits, so a match could span two
+  facts that have nothing to do with each other or with money. A draft promising
+  ₦9,000 was judged supported because a case reference ran into a deadline's
+  microseconds. Amounts are now compared as values, number by number. This is the
+  gate that stops a reply inventing a refund, so a coincidence passing it is the
+  worst way for it to fail.
+- **An amount ending a sentence was read as a truncated prefix.** The claim
+  pattern's trailing guard rejected a number followed by a full stop, so a weaker
+  alternative matched and `₦9,000.` was extracted as the claim `₦9` — which
+  almost any text appears to support. The guard now rejects a number that
+  *continues* rather than a sentence that *ends*. Found because the strict
+  value comparison above stopped hiding it.
+
 ## [2.0.0] — every amplifier delivered
 
 Phases 0–12 of `docs/ROADMAP.md`. The specification shipped at v1.0; the twenty

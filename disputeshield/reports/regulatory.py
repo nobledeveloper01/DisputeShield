@@ -87,6 +87,15 @@ class Export:
 
 
 def build(*, tenant, period_from: datetime, period_to: datetime) -> Export:
+    """Assemble the bundle. Always all four files.
+
+    There is deliberately no way to build it without the PDF, tempting as that is
+    for `format=json`, which never reads the document. A period has exactly one
+    manifest: leaving the PDF out would produce a second one, signed over a
+    different file list, and two callers asking about the same period would come
+    away with signatures that disagree. Rendering a document nobody reads is the
+    cheaper mistake.
+    """
     cases = list(
         Dispute.objects.filter(submitted_at__gte=period_from, submitted_at__lt=period_to)
         # Total ordering. `reference` is unique per tenant, so this is stable
@@ -126,6 +135,19 @@ def build(*, tenant, period_from: datetime, period_to: datetime) -> Export:
         "generated_at": None,
         "signature": sign_payload(_signable(body)),
     }
+    # Rendered from the export rather than from a second query, so the PDF and
+    # the CSVs cannot describe two different reads of the same period.
+    from disputeshield.reports import pdf as pdf_renderer
+
+    document = pdf_renderer.render(export=Export(files=files, manifest=manifest), tenant=tenant)
+    files["report.pdf"] = document
+    digests["report.pdf"] = hashlib.sha256(document).hexdigest()
+
+    # Re-sign now that the bundle has a third file. The PDF quotes the CSVs'
+    # digests and the manifest covers the PDF's, which is a chain rather than a
+    # cycle: nothing signs its own digest.
+    body["files"] = digests
+    manifest = {**body, "generated_at": None, "signature": sign_payload(_signable(body))}
     return Export(files=files, manifest=manifest)
 
 

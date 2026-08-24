@@ -24,6 +24,9 @@ dependencies = [
     "cryptography>=43.0",
     "orjson>=3.10",
     "python-dateutil>=2.9",
+    # §7.3 documents `format=pdf` on the regulatory report. A documented endpoint
+    # that fails on a fresh install because of an optional extra is worse.
+    "reportlab>=4.2",
 ]
 
 [project.optional-dependencies]

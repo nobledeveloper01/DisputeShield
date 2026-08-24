@@ -236,7 +236,12 @@ class TestThroughTheApi:
         assert response["Content-Type"] == "application/zip"
 
         with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
-            assert sorted(archive.namelist()) == ["cases.csv", "history.csv", "manifest.json"]
+            assert sorted(archive.namelist()) == [
+                "cases.csv",
+                "history.csv",
+                "manifest.json",
+                "report.pdf",
+            ]
             manifest = json.loads(archive.read("manifest.json"))
         assert manifest["case_count"] == 3
 

@@ -18,13 +18,20 @@ from __future__ import annotations
 
 import dataclasses
 import re
+from decimal import Decimal, InvalidOperation
 
 # Amounts. Deliberately broad: "₦50,000", "50000", "NGN 50,000.00", "50k".
+# The trailing guard is `(?!\w)(?!\.\d)` rather than `(?![\w.])`: it must reject a
+# number that *continues* ("1.234.567"), not a sentence that ends. The stricter
+# form rejected the most ordinary way an amount is written — last thing before a
+# full stop — and a weaker alternative below then matched a prefix, so "₦9,000."
+# was extracted as the claim "₦9". The gate compared the wrong value and, because
+# a lone "9" turns up in almost any text, called it supported.
 AMOUNT = re.compile(
-    r"(?<![\w.])(?:[₦$€£]\s?)?\d{1,3}(?:[,\s]\d{3})+(?:\.\d{1,2})?(?![\w.])"
-    r"|(?<![\w.])(?:[₦$€£]\s?)\d+(?:\.\d{1,2})?(?![\w.])"
-    r"|(?<![\w.])\d+(?:\.\d{1,2})?\s?(?:k|K)(?![\w.])"
-    r"|(?<![\w.])\d{4,}(?:\.\d{1,2})?(?![\w.])"
+    r"(?<![\w.])(?:[₦$€£]\s?)?\d{1,3}(?:[,\s]\d{3})+(?:\.\d{1,2})?(?!\w)(?!\.\d)"
+    r"|(?<![\w.])(?:[₦$€£]\s?)\d+(?:\.\d{1,2})?(?!\w)(?!\.\d)"
+    r"|(?<![\w.])\d+(?:\.\d{1,2})?\s?(?:k|K)(?!\w)(?!\.\d)"
+    r"|(?<![\w.])\d{4,}(?:\.\d{1,2})?(?!\w)(?!\.\d)"
 )
 
 # Dates and relative deadlines. A customer holds the firm to "by Friday" exactly
@@ -112,8 +119,8 @@ def check(draft: str, sources: list[str]) -> GroundingResult:
     for claim in extract_claims(draft):
         needle = _normalise(claim.text)
         if claim.kind == "amount":
-            needle = _digits(needle)
-            if needle and needle in _digits(haystack):
+            claimed = _amounts(needle)
+            if claimed and claimed <= _amounts(haystack):
                 continue
         elif needle in haystack:
             continue
@@ -134,6 +141,25 @@ def _normalise(text: str) -> str:
     return " ".join((text or "").lower().split())
 
 
-def _digits(text: str) -> str:
-    """Compare amounts by their digits, so "50,000" matches "50000"."""
-    return re.sub(r"\D", "", text or "")
+def _amounts(text: str) -> set[Decimal]:
+    """The numbers in a text, one value per token.
+
+    Number by number, deliberately. Stripping every non-digit from the joined
+    sources produces a single long digit string, and a substring search over it
+    matches across boundaries that mean nothing: a draft promising ₦9,000 was
+    judged supported because a case reference ran into a deadline's microseconds
+    and the run of digits happened to contain 9000. The gate then passed a
+    financial commitment the case did not support, which is the one thing it
+    exists to prevent.
+
+    Comparing values rather than digit strings also keeps "50,000" matching
+    "50000" and "9,000.00" matching "9,000", which is why the strict form is
+    affordable.
+    """
+    values: set[Decimal] = set()
+    for token in re.findall(r"\d[\d,]*(?:\.\d+)?", text or ""):
+        try:
+            values.add(Decimal(token.replace(",", "")))
+        except InvalidOperation:
+            continue
+    return values

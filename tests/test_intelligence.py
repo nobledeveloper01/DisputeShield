@@ -100,6 +100,45 @@ class TestGroundingAdversarially:
         amounts = [c for c in claims if c.kind == "amount"]
         assert len(amounts) == 1
 
+    def test_an_amount_is_not_grounded_by_digits_that_span_two_sources(self):
+        """The defect this pins let the gate pass an invented refund.
+
+        Comparing a claim's digits against every digit in the joined sources
+        produces one long string in which almost any short number can be found.
+        Here 9000 falls across a case reference and a deadline's microseconds —
+        two facts that have nothing to do with an amount and nothing to do with
+        each other. The draft promises ₦9,000 and no source supports it.
+        """
+        sources = [
+            "The transfer failed.",
+            "DS-2026-GQG4YR",
+            "2026-09-04T14:12:55.900042+00:00",
+        ]
+        assert "9000" in "".join(c for c in "".join(sources) if c.isdigit())
+
+        unsupported = check("We will refund you ₦9,000 on Friday.", sources).unsupported
+        assert "amount" in {claim.kind for claim in unsupported}
+
+    def test_an_amount_that_ends_a_sentence_is_read_whole(self):
+        """The most ordinary way an amount is written, and it was truncated.
+
+        The trailing boundary guard rejected a number followed by a full stop, so
+        a weaker alternative matched a prefix and "₦9,000." became the claim
+        "₦9" — which any text containing a 9 appears to support.
+        """
+        assert [c.text for c in extract_claims("We refunded ₦9,000.")] == ["₦9,000"]
+        assert [c.text for c in extract_claims("Total 9,000.50.")] == ["9,000.50"]
+
+    def test_a_number_that_continues_is_still_rejected(self):
+        """What the strict guard was protecting, kept."""
+        assert not extract_claims("ref 1.234.567 here")
+        assert not extract_claims("total 9,000.505 no")
+
+    def test_the_same_amount_written_differently_still_matches(self):
+        """Strictness is affordable because values are compared, not digit strings."""
+        assert check("We refunded ₦50000.", ["We refunded 50,000"]).grounded
+        assert check("We refunded ₦9,000.", ["amount 9,000.00 was paid"]).grounded
+
 
 class TestCopilot:
     def test_a_grounded_draft_is_accepted_and_recorded(self, tenant_a, make_dispute, as_tenant):

@@ -898,23 +898,37 @@ paths:
       security:
       - agentKey: []
       description: 'Compliance role only: an export is a disclosure of every case in the period. Returns
-        a zip of `cases.csv`, `history.csv` and `manifest.json`. **Byte-reproducible** — a supervisor
-        who asks for the same period twice and gets two different files has a reason to doubt the rest
-        of it.'
+        a zip of `cases.csv`, `history.csv`, `report.pdf` and `manifest.json`. **Byte-reproducible** —
+        a supervisor who asks for the same period twice and gets two different files has a reason to
+        doubt the rest of it. The PDF is the document a supervisor reads; the CSVs are what their
+        systems ingest. Both are covered by the same signed manifest, so the readable document and the
+        machine-readable one cannot describe two different reads.'
       parameters:
       - $ref: '#/components/parameters/PeriodFrom'
       - $ref: '#/components/parameters/PeriodTo'
       - name: format
         in: query
+        description: 'Note for client generators: this is the application''s parameter, not a renderer
+          hint. DRF''s `URL_FORMAT_OVERRIDE` is disabled so that `pdf` and `csv` reach the view. An
+          unrecognised value answers 400 rather than falling back to the zip.'
         schema:
           type: string
           enum:
           - zip
           - json
+          - pdf
+          - csv
           default: zip
       responses:
         '200':
-          description: The bundle, or the manifest alone.
+          description: The bundle, the manifest alone, the PDF, or `cases.csv`.
+          content:
+            application/zip: {}
+            application/json: {}
+            application/pdf: {}
+            text/csv: {}
+        '400':
+          description: An unrecognised `format`.
         '404': *id002
   /v1/audit/verify:
     get:

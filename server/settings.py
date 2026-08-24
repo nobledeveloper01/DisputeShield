@@ -68,6 +68,13 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "disputeshield.api.pagination.DisputeCursorPagination",
     "PAGE_SIZE": 50,
     "UNAUTHENTICATED_USER": None,
+    # `format` is the application's parameter, not the renderer's. DRF reserves
+    # this query parameter to select a renderer by name and raises 404 for one it
+    # does not recognise — so §7.3's documented `?format=pdf` returned "no such
+    # resource" before the view ever ran, while `?format=json` appeared to work
+    # only because DRF happens to have a renderer by that name. Disabling the
+    # override gives the parameter back to the views that document it.
+    "URL_FORMAT_OVERRIDE": None,
 }
 
 ROOT_URLCONF = "server.urls"
