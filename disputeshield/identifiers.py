@@ -143,6 +143,18 @@ def settlement_id() -> str:
     return new_id("stl")
 
 
+def suggestion_id() -> str:
+    return new_id("sug")
+
+
+def cluster_id() -> str:
+    return new_id("clu")
+
+
+def signal_id() -> str:
+    return new_id("sig")
+
+
 def message_id() -> str:
     return new_id("msg")
 

@@ -9,6 +9,68 @@ and released from one tag.
 
 ## [Unreleased]
 
+### Added — phase 10, intelligence that proposes and never disposes (v1.4)
+
+Amplifiers **A11** triage, **A12** copilot, **A10** root-cause clustering,
+**A13** repeat-claimant signals.
+
+Every deliverable in this phase proposes. None disposes. The gates exist mostly
+to keep it that way, because the commercial pull toward "just let it auto-resolve
+the easy ones" arrives in this phase and the answer has to have been decided
+before the pull does.
+
+- `Suggestion` is a **separate model with no path to case fields**. §3.3 lists
+  priority prediction under *Won't*, and a model writing a case field is how that
+  exclusion gets quietly reversed. What the human chose is recorded beside what
+  was proposed — and that difference only exists because the suggestion never
+  became the case's own field.
+- Every suggestion, acceptance and override is an audit record naming the model
+  and its version. Without that, the accuracy metric is a number about nothing
+  and a behaviour shift is unattributable.
+- Accuracy is exported per tenant, and is **`None` rather than 1.0** before any
+  decision: an untested model is not a perfect one.
+- Triage proposes a category with the words that matched, and proposes **nothing**
+  when the description carries no signal — a wrong category starts the wrong
+  regulatory clock, so silence beats a confident guess.
+- The copilot **blocks** an ungrounded draft rather than flagging it. A warning
+  beside a draft is one an agent under queue pressure clicks past; a block is a
+  thing they have to resolve. Retrieval reaches the case's own content, the
+  tenant's templates and its resolved history — never an internal note, never
+  another tenant, and never the model's own prior output.
+- Clustering is a lens: inspectable membership, its evidence attached, and it
+  discards a term appearing in almost every case because that term is describing
+  the product rather than a cause.
+- Risk signals are context with their evidence. They cannot reach an SLA policy,
+  a priority, a channel gate or an outcome — and the service layer does not read
+  them at all, so a rejection cannot cite one as its reason.
+
+### Gates added — permanent
+
+- **No model output writes to a case.** AST-walked across every intelligence
+  module: no write to a case model, no call to a disposition (`transition`,
+  `resolve`, `assign`, `pause`…), and no import of a service that could act.
+- **No autonomous send on any channel**, asserted against the send path itself —
+  so no configuration can enable one, because there is nothing to configure.
+- **A signal cannot decide.** `signals.py` assigns no case attribute, `RiskSignal`
+  has no field a future author could point at an outcome, and `service.py`
+  contains no reference to signals at all.
+- **Clustering writes only its own snapshot.**
+
+### On the commitment boundary
+
+The grounding check targets the three things a customer holds a firm to: *when*,
+*how much*, and *that you will*. "We are looking into this" is grounded; "we will
+keep you updated" is not, because "we will" is quotable back at the firm even when
+what follows is mild. That line is stated in the test rather than left implicit,
+since it is the judgement most likely to be revisited.
+
+### Tests — 524 fast, 9 wall-clock gates, 91% coverage
+
+The adversarial grounding suite is eight individual sentences somebody could
+plausibly write, each asserted to be caught: an invented date, an invented
+amount, "rest assured", "we guarantee", and a promise made true only by a related
+word appearing nearby.
+
 ### Added — phase 9, the money side (v1.3)
 
 Amplifiers **A5** representment packs, **A4** provider connectors, **A16**

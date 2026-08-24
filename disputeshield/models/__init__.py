@@ -43,6 +43,11 @@ from disputeshield.models.intake import (
     IngestAddress,
     hash_identity,
 )
+from disputeshield.models.intelligence import (
+    RiskSignal,
+    RootCauseCluster,
+    Suggestion,
+)
 from disputeshield.models.policy import SLAPolicy, SLAPolicyVersion
 from disputeshield.models.returns import RegulatoryReturn, ReturnTemplate
 from disputeshield.models.scheme import ReasonCode, Representment
@@ -84,6 +89,8 @@ __all__ = [
     "Representment",
     "ResponseTemplate",
     "ReturnTemplate",
+    "RiskSignal",
+    "RootCauseCluster",
     "SLAClock",
     "SLADeadline",
     "SLAEvent",
@@ -91,6 +98,7 @@ __all__ = [
     "SLAPolicyVersion",
     "SettlementConfirmation",
     "Status",
+    "Suggestion",
     "SweepHeartbeat",
     "Tenant",
     "TransactionContext",

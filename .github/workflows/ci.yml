@@ -180,6 +180,14 @@ jobs:
       - name: the scheme clock and the regulatory clock breach independently
         run: pytest tests/test_money_side.py -q
 
+      - name: the intelligence proposes and never disposes (§3.3, permanent)
+        # No model output writes to a case; no autonomous send on any channel;
+        # a fraud signal cannot reach an outcome; clustering writes nothing.
+        run: pytest tests/test_advisory_only.py -q
+
+      - name: an ungrounded draft is blocked, not flagged
+        run: pytest tests/test_intelligence.py -q
+
       # Added in the phase that makes each one real:
       #   phase 4 — widget isolation in both directions
       #   phase 9 — no call path from any module to a payment write

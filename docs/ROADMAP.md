@@ -402,6 +402,10 @@ way, because this is the phase where the product could quietly stop being a syst
 **Review:** `/cso` and `/plan-ceo-review`. The commercial pull toward "just let it auto-resolve the
 easy ones" arrives in this phase, and the answer needs to have been decided before the pull does.
 
+> **Status: complete.** Every gate is structural — an AST walk or an introspection
+> — rather than a behavioural sample, because a behavioural test proves the paths
+> we thought of are closed and this phase needs the ones we did not.
+
 ---
 
 ## Phase 11 — Operating the operation — **v1.5**
