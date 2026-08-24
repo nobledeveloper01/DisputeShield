@@ -60,3 +60,19 @@ test('every form control has a programmatic label', async ({ page }) => {
     expect(name, `control ${index} has no label`).not.toEqual('');
   }
 });
+
+test('every cell in a table row shares its row’s bottom edge', async ({ page }) => {
+  // A `display: flex` on a `<td>` stops it being a table cell, so it drops out of
+  // the row's height calculation and its bottom border draws above the rest of
+  // the divider. That happened here, it looked like a small alignment quirk, and
+  // it survived two plausible fixes aimed at the cell's height — which was never
+  // the problem. Measured rather than eyeballed, because a 3px break is exactly
+  // the kind of thing a screenshot review waves through.
+  const rows = await page.locator('.ds-table tbody tr').evaluateAll((trs) =>
+    trs.map((tr) => [...tr.children].map((td) => Math.round(td.getBoundingClientRect().bottom)))
+  );
+  expect(rows.length).toBeGreaterThan(0);
+  for (const bottoms of rows) {
+    expect(new Set(bottoms).size, `row cells end at ${bottoms.join(', ')}`).toBe(1);
+  }
+});

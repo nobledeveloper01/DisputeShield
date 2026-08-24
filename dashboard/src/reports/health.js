@@ -68,8 +68,10 @@ export function healthOf(schedule) {
   return {
     state: 'current',
     label: 'UP TO DATE',
+    // Not "last delivered X" — the row prints that on its own line, and saying
+    // it twice makes the one line that matters read as filler.
     detail: schedule.last_period_delivered
-      ? `Last delivered ${schedule.last_period_delivered}.`
+      ? 'Nothing owed. The next report goes out once the current month closes.'
       : 'Nothing due yet. The first report covers the month this schedule was created in.'
   };
 }

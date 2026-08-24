@@ -165,6 +165,14 @@ and released from one tag.
 
 ### Fixed
 
+- **A `display: flex` on a `<td>` broke the recipients table's dividers.** It
+  stops the element being a table cell, so it drops out of the row's height
+  calculation and its bottom border draws above the rest of the line. The rule
+  was written for the schedule cards and reached the table cell by sharing a
+  class name. It looked like a small alignment quirk and survived two plausible
+  fixes aimed at the cell's *height*, which was never the problem. The browser
+  suite now measures every row's cell bottoms rather than trusting a screenshot
+  review to catch a 3px break.
 - **`scripts/no-dangerous-html.sh` scanned build output.** React's own minified
   internals contain every string it greps for, so running it on a built tree
   reported a failure that blamed a library and could not be fixed. It passed in

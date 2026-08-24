@@ -79,11 +79,21 @@ body {
   border-bottom: 1px solid var(--ds-line);
 }
 .ds-table td {
-  padding: var(--ds-space);
+  /* Row rhythm comes from padding. Rows here are taller than the queue's 44px on
+     purpose — each carries a label and a reason, and squeezing that into a queue
+     row would make both unreadable. */
+  padding: calc(var(--ds-space) * 1.5) var(--ds-space);
   border-bottom: 1px solid var(--ds-line);
-  height: var(--ds-row);
   vertical-align: top;
 }
+/* Middle, so a 32px button sits on the row's centre line rather than riding its
+   top edge next to two lines of text. Note this cell is deliberately *not* the
+   flex container `.ds-actions` is elsewhere: `display: flex` on a `<td>` stops
+   it being a table cell, so it drops out of the row's height calculation and its
+   bottom border draws above the rest of the divider. That was the cause of a
+   broken line under every row with a button, and it survived two plausible
+   fixes aimed at the cell's height, which was never the problem. */
+.ds-table td.ds-actions { vertical-align: middle; white-space: nowrap; text-align: right; }
 .ds-row-inactive td { color: var(--ds-muted); }
 
 .ds-schedules { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ds-space); }
@@ -146,8 +156,16 @@ body {
   border-top: 1px solid var(--ds-line);
   max-width: 640px;
 }
-.ds-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--ds-space) * 2); }
-.ds-field { display: grid; gap: 4px; }
+/* `align-items: start` so the three fields' labels and inputs line up across the
+   row. Without it each field stretches to the tallest and distributes its own
+   rows, which puts the Hour input half a field lower than the one beside it. */
+.ds-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: calc(var(--ds-space) * 2);
+  align-items: start;
+}
+.ds-field { display: grid; gap: 4px; align-content: start; }
 .ds-field label { font-weight: 600; font-size: 13px; }
 .ds-input {
   font: inherit;
@@ -175,7 +193,7 @@ body {
 /* The primary button is ink, not an accent colour. Colour is for time. */
 .ds-button-primary { background: var(--ds-ink); color: var(--ds-bg); border-color: var(--ds-ink); }
 .ds-button-primary:hover:not(:disabled) { background: #000; }
-.ds-actions { display: flex; gap: var(--ds-space); }
+.ds-schedule .ds-actions { display: flex; gap: var(--ds-space); }
 
 /* A visible focus ring everywhere, in ink. Keyboard operability is a regulatory
    obligation here (§9), not a preference. */

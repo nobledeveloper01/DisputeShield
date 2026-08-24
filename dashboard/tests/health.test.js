@@ -16,6 +16,12 @@ test('a schedule that is up to date carries no colour', () => {
   assert.equal(healthOf(base).state, 'current');
 });
 
+test('the up-to-date detail does not repeat the line beside it', () => {
+  // The row prints "Last delivered: 2026-04-01" on its own line. Saying it twice
+  // makes the one line that matters read as filler.
+  assert.doesNotMatch(healthOf(base).detail, /2026-04-01/);
+});
+
 test('a month owed and recently due is the normal state, not an alarm', () => {
   const health = healthOf({ ...base, periods_owed: ['2026-05-01'] });
   assert.equal(health.state, 'owed');
