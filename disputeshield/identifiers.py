@@ -75,6 +75,10 @@ def notification_id() -> str:
     return new_id("ntf")
 
 
+def checkpoint_id() -> str:
+    return new_id("ckp")
+
+
 def message_id() -> str:
     return new_id("msg")
 

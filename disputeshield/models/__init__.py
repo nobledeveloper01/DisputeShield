@@ -5,7 +5,7 @@ from disputeshield.models.attachment import (
     ResponseTemplate,
     TransactionContext,
 )
-from disputeshield.models.audit import AuditRecord
+from disputeshield.models.audit import AuditCheckpoint, AuditRecord
 from disputeshield.models.calendars import BusinessCalendar, BusinessHoursWindow, Holiday
 from disputeshield.models.clock import (
     NotificationOutbox,
@@ -30,6 +30,7 @@ __all__ = [
     "APIKey",
     "Agent",
     "AllowedOrigin",
+    "AuditCheckpoint",
     "AuditRecord",
     "BusinessCalendar",
     "BusinessHoursWindow",

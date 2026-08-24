@@ -1,0 +1,34 @@
+{{/*
+  Celery beat. One replica, always.
+
+  `replicas: 1` is written here rather than read from values on purpose. §11.1
+  says exactly one replica holding a leader lock, and a chart that exposes the
+  number is a chart where somebody eventually raises it during an incident to
+  "process the backlog faster" — producing double-fired tasks and duplicate
+  breach pages, which is the opposite of what they wanted.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-beat
+spec:
+  replicas: 1
+  strategy:
+    # Never two schedulers alive at once, not even for a rollout second.
+    type: Recreate
+  selector:
+    matchLabels: {app: {{ .Release.Name }}-beat}
+  template:
+    metadata:
+      labels: {app: {{ .Release.Name }}-beat}
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      containers:
+        - name: beat
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          command: ["celery", "-A", "server.celery", "beat", "--loglevel", "INFO"]
+          envFrom:
+            - secretRef: {name: {{ .Values.secrets.existingSecret }}}
+          env:
+            - name: DISPUTESHIELD_BEAT_LOCK_TTL
+              value: "{{ .Values.beat.leaderLockTtlSeconds }}"

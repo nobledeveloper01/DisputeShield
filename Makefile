@@ -80,6 +80,21 @@ widget:  ## Build the loader and the widget, and publish the bundle
 browser: widget  ## Isolation, keyboard and axe gates in a real browser
 	npx --prefix widget playwright install chromium
 	npm run test:e2e --prefix widget
+	$(MAKE) stop-servers
+
+.PHONY: stop-servers
+stop-servers:  ## Stop servers Playwright left running
+	@# `reuseExistingServer` keeps the Django and fixture servers alive between
+	@# local runs, which is convenient until they hold database connections
+	@# during the p95 gate and it fails for reasons that have nothing to do with
+	@# the code. This has happened three times; hence the target.
+	@pkill -f "manage.py runserver 127.0.0.1:8011" 2>/dev/null || true
+	@pkill -f "tests/serve-host.mjs" 2>/dev/null || true
+	@echo "stopped any lingering test servers"
+
+.PHONY: packaging
+packaging:  ## Build a wheel, install it into a bare project, file a dispute
+	scripts/packaging-gate.sh
 
 .PHONY: hello
 hello:  ## Empty database to a filed dispute with a computed deadline

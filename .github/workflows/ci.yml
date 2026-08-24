@@ -149,6 +149,12 @@ jobs:
         # query fires nothing in production while passing every other test.
         run: pytest tests/test_platform_scope.py -q
 
+      - name: the export is byte-reproducible and its attestation verifies
+        run: pytest tests/test_reports.py -q
+
+      - name: the sweep clears 10,000 due deadlines inside 60s (§11.9)
+        run: pytest tests/test_sweep_at_load.py -q
+
       # Added in the phase that makes each one real:
       #   phase 4 — widget isolation in both directions
       #   phase 9 — no call path from any module to a payment write
@@ -263,8 +269,42 @@ jobs:
           name: playwright-traces
           path: widget/test-results/
 
+  packaging:
+    # §6.2 is a distribution promise, and it is only true if it is tested as one:
+    # build a wheel, install it into a bare Django project, and drive the
+    # documented install path. Never imports the working tree — a test that does
+    # proves the code works, not that the package does.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: disputeshield_owner
+          POSTGRES_PASSWORD: disputeshield
+          POSTGRES_DB: disputeshield
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U disputeshield_owner"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m venv .venv && .venv/bin/pip install -e ".[dev,server]"
+      - name: Create the restricted application role
+        run: psql "postgres://disputeshield_owner:disputeshield@localhost:5432/disputeshield" -f scripts/init-app-role.sql
+        env:
+          PGPASSWORD: disputeshield
+      - name: pip install -> init -> doctor -> file a dispute -> verify the chain
+        run: scripts/packaging-gate.sh
+        env:
+          DISPUTESHIELD_DATABASE_URL: postgres://disputeshield:disputeshield@localhost:5432/disputeshield
+          PACKAGING_PYTHON: python3.12
+
   build:
-    needs: [quality, gates, security, frontend, browser]
+    needs: [quality, gates, security, frontend, browser, packaging]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -298,3 +338,15 @@ jobs:
         with:
           name: trivy-report
           path: trivy-unfixed.sarif
+
+      # §8.5 promises a customer's security team can assess DisputeShield without
+      # asking. An SBOM published per release is how that promise is kept.
+      - uses: anchore/sbom-action@v0
+        with:
+          image: disputeshield:ci
+          format: spdx-json
+          output-file: image-sbom.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-sbom
+          path: image-sbom.json

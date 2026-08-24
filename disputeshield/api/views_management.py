@@ -15,7 +15,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from disputeshield.api.idempotency import IdempotentCreateMixin
-from disputeshield.api.middleware import resolve_acting_agent
+from disputeshield.api.mixins import ActingAgentMixin
 from disputeshield.api.pagination import DisputeCursorPagination
 from disputeshield.api.permissions import CanReadOnly, CanWorkTheQueue
 from disputeshield.api.serializers_management import (
@@ -35,19 +35,6 @@ from disputeshield.disputes.states import IllegalTransition
 from disputeshield.models import Agent, Dispute, DisputeMessage
 from disputeshield.models.dispute import Status
 from disputeshield.sla import clock as clock_service
-
-
-class ActingAgentMixin:
-    """Resolve the acting agent before permissions run.
-
-    `initial()` is the hook that runs after authentication (so the tenant context
-    exists) and before permission checks (which depend on the agent's role).
-    """
-
-    def initial(self, request, *args, **kwargs):
-        super().initial(request, *args, **kwargs)
-        resolve_acting_agent(request)
-        self.check_permissions(request)
 
 
 class DisputeViewSet(

@@ -260,6 +260,13 @@ attacked, after the widget.
 **Review:** `/cso` full audit, `/devex-review` on the install path, `/document-release`.
 
 > **v1.0 ships here.** Everything below is `docs/AMPLIFIERS.md`.
+>
+> **Status: phases 0–6 complete.** Every exit gate above runs in CI. Two are worth
+> naming because they changed the code rather than confirming it: the packaging
+> gate found that `SET LOCAL` outside a transaction is silently discarded — the
+> third appearance of that failure shape — and the load gate found the sweep
+> missing §11.9's budget by 26%, which forced the batched audit append ADR-0003
+> had anticipated.
 
 ---
 

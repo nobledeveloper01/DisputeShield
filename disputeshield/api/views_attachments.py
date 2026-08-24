@@ -97,7 +97,9 @@ class AttachmentDownloadView(APIView):
         except storage.SignatureInvalid:
             return self._denied()
 
-        with db_tenant_context(tenant_id):
+        from django.db import transaction
+
+        with transaction.atomic(), db_tenant_context(tenant_id):
             attachment = DisputeAttachment.objects.all_tenants().filter(pk=attachment_id).first()
             if attachment is None or not attachment.is_retrievable:
                 # A pending or infected file is indistinguishable from one that

@@ -37,8 +37,11 @@ app.conf.beat_schedule = {
         "task": "disputeshield.sla.sweep",
         "schedule": crontab(minute="*"),
     },
-    "disputeshield-audit-verify": {
-        "task": "disputeshield.audit.verify_chains",
+    "disputeshield-audit-checkpoint": {
+        # Nightly. A failed verification still produces a checkpoint marked
+        # unverified — silence after a failed check is indistinguishable from
+        # the job not having run, and §11.4 pages on exactly this condition.
+        "task": "disputeshield.audit.checkpoint",
         "schedule": crontab(hour=3, minute=0),
     },
     "disputeshield-notification-dispatch": {

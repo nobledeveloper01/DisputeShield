@@ -56,12 +56,33 @@ class TenantContextMiddleware:
             context.reset(token)
 
 
+class NoTransaction(RuntimeError):
+    """`SET LOCAL` was issued outside a transaction, where it does nothing.
+
+    Postgres warns and moves on, so the failure is silent: the variable is never
+    set, row level security matches nothing, and every query returns zero rows.
+    Nothing raises, nothing logs, and a background job reports that it found no
+    work to do.
+
+    This is the third time that shape of bug appeared in this codebase — the SLA
+    sweep, the attachment download, and the packaged-install smoke test — so it
+    raises now instead of being something each caller has to remember.
+    """
+
+
 def set_tenant_context(tenant_id: str) -> None:
     """Set the RLS session variable, local to the current transaction.
 
     The third argument to set_config is is_local=true. Passing false here would
     reintroduce ADR-0005's cross-tenant leak, so it is never parameterised.
     """
+    if not connection.in_atomic_block:
+        raise NoTransaction(
+            "Tenant context must be established inside a transaction. `SET LOCAL` "
+            "outside one is discarded, so row level security would match nothing "
+            "and every query would quietly return zero rows. Wrap the call in "
+            "`transaction.atomic()` — or use `for_each_tenant`, which does."
+        )
     with connection.cursor() as cursor:
         cursor.execute("SELECT set_config(%s, %s, true)", [SESSION_VARIABLE, tenant_id])
 

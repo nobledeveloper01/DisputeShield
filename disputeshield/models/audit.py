@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.db import models
 
-from disputeshield.identifiers import audit_id
+from disputeshield.identifiers import audit_id, checkpoint_id
 from disputeshield.tenancy.managers import TenantScopedManager, TenantScopedQuerySet
 
 
@@ -99,3 +99,62 @@ class AuditRecord(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Audit records cannot be deleted (§8.3).")
+
+
+class AuditCheckpoint(models.Model):
+    """A signed statement about a tenant's chain at a moment (§8.3).
+
+    Verification walks the whole chain, which is O(records) and grows forever. A
+    checkpoint is what lets a later verification start from a known-good point
+    and what gives an auditor something small and signed to keep — the chain
+    proves internal consistency, and a checkpoint is our attestation that we
+    computed it and got this answer on this date.
+
+    Scoped like everything else that carries a tenant. The first version of this
+    model declared a `tenant` field with an unscoped default manager, on the
+    reasoning that a platform job reads it — and the registry-walk test in
+    `tests/test_tenant_isolation.py` failed it immediately, which is exactly what
+    that test is for. Platform jobs get their scope from `for_each_tenant`, not
+    from an exemption.
+    """
+
+    id = models.CharField(primary_key=True, max_length=32, default=checkpoint_id, editable=False)
+    tenant = models.ForeignKey(
+        "disputeshield.Tenant", on_delete=models.PROTECT, related_name="+", db_index=True
+    )
+
+    sequence_from = models.BigIntegerField()
+    sequence_to = models.BigIntegerField()
+    record_count = models.BigIntegerField()
+    head_hash = models.CharField(max_length=71)
+
+    verified = models.BooleanField()
+    failure_detail = models.TextField(blank=True)
+
+    computed_at = models.DateTimeField(auto_now_add=True)
+    # HMAC over the checkpoint's own content. Phase 8 (amplifier A8) adds an
+    # external RFC 3161 timestamp; until then this proves we produced it, not
+    # when — and `GET /v1/audit/verify` reports those as two separate facts so
+    # nobody reads the weaker claim as the stronger one.
+    signature = models.CharField(max_length=128)
+
+    objects = TenantScopedManager()
+
+    class Meta:
+        db_table = "disputeshield_auditcheckpoint"
+        ordering = ["tenant_id", "-sequence_to"]
+        default_permissions = ()
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "sequence_to"], name="uniq_checkpoint_per_tenant_head"
+            )
+        ]
+
+    def __str__(self) -> str:
+        state = "ok" if self.verified else "FAILED"
+        return f"checkpoint {self.sequence_from}-{self.sequence_to} ({state})"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise PermissionError("Checkpoints are statements about a moment and are immutable.")
+        return super().save(*args, **kwargs)

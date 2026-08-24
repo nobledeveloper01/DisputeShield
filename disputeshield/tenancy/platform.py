@@ -21,6 +21,8 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 
+from django.db import transaction
+
 from disputeshield.models import Tenant
 from disputeshield.tenancy import context
 from disputeshield.tenancy.middleware import db_tenant_context
@@ -42,7 +44,19 @@ def for_each_tenant[T](work: Callable[[str], T], *, active_only: bool = True) ->
     Postgres session variable RLS reads. Setting only the second leaves every
     `Model.objects` call raising `TenantContextRequired`; setting only the first
     leaves every query returning nothing.
+
+    And a transaction around each, because `SET LOCAL` outside one is discarded —
+    silently. A Celery task runs in autocommit, so a version of this function
+    without the `atomic()` below sets nothing, matches nothing, and reports that
+    there was no work to do.
+
+    One transaction per tenant rather than one for the whole loop: a failure
+    while sweeping the eleventh tenant must not roll back the ten before it.
     """
     for tenant_id in tenant_ids(active_only=active_only):
-        with context.tenant_context(tenant_id), db_tenant_context(tenant_id):
+        with (
+            transaction.atomic(),
+            context.tenant_context(tenant_id),
+            db_tenant_context(tenant_id),
+        ):
             yield work(tenant_id)

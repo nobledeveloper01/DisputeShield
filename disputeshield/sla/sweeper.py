@@ -21,6 +21,7 @@ from datetime import datetime
 from django.db import transaction
 from django.utils import timezone
 
+from disputeshield import audit
 from disputeshield.models import (
     NotificationOutbox,
     SLAClock,
@@ -28,7 +29,6 @@ from disputeshield.models import (
     SLAEvent,
     SweepHeartbeat,
 )
-from disputeshield.sla.clock import _record, remaining_seconds
 
 BATCH_SIZE = 500
 
@@ -88,22 +88,29 @@ def sweep(*, now: datetime | None = None, limit: int = BATCH_SIZE) -> SweepResul
 def _sweep_one_tenant(now: datetime, limit: int) -> tuple[int, int]:
     fired = created = 0
     while True:
-        batch = _claim(now, limit)
-        if not batch:
-            break
-        for deadline in batch:
-            if _fire(deadline, now):
-                created += 1
-            fired += 1
-        if len(batch) < limit:
+        batch_fired, batch_created = _fire_batch(now, limit)
+        fired += batch_fired
+        created += batch_created
+        if batch_fired < limit:
             break
     return fired, created
 
 
-def _claim(now: datetime, limit: int) -> list[SLADeadline]:
-    """Take the next tranche of due deadlines, skipping any another worker holds."""
+def _fire_batch(now: datetime, limit: int) -> tuple[int, int]:
+    """Claim and fire one tranche inside a single transaction.
+
+    Claiming and firing were separate transactions in the first version, which
+    made `SKIP LOCKED` almost decorative: the claim's locks were released at its
+    own commit, so every row had to be re-locked individually a moment later.
+    Ten thousand due deadlines then cost ten thousand transactions, ten thousand
+    advisory-locked audit appends and 75 seconds against a 60-second budget.
+
+    Holding one transaction for the tranche keeps the row locks for as long as
+    they mean anything, and lets the writes below be three statements instead of
+    four per row.
+    """
     with transaction.atomic():
-        return list(
+        batch = list(
             SLADeadline.objects.all_tenants()
             .filter(fired_at__isnull=True, fires_at__lte=now)
             .exclude(clock__state=SLAClock.State.STOPPED)
@@ -111,64 +118,81 @@ def _claim(now: datetime, limit: int) -> list[SLADeadline]:
             .select_related("clock", "clock__policy_version", "tenant")
             .select_for_update(skip_locked=True)[:limit]
         )
+        if not batch:
+            return 0, 0
 
+        tenant = batch[0].tenant
+        events = []
+        notifications = []
+        audit_entries = []
 
-def _fire(deadline: SLADeadline, now: datetime) -> bool:
-    """Mark fired and record the notification, in one transaction.
+        for deadline in batch:
+            deadline.fired_at = now
+            clock = deadline.clock
+            breached = deadline.kind in {
+                SLADeadline.Kind.ACKNOWLEDGEMENT,
+                SLADeadline.Kind.RESOLUTION,
+            }
+            kind = SLAEvent.Kind.BREACHED if breached else SLAEvent.Kind.WARNED
+            # §11.5 step 5: a breach detected late must say so, so the lateness is
+            # attributable to the systems cause rather than to the handling.
+            late = max(0, int((now - deadline.fires_at).total_seconds()))
+            payload = {
+                "clock_id": clock.pk,
+                "reason": "",
+                "clock_remaining_seconds": 0,
+                "deadline_kind": deadline.kind,
+                "threshold_percent": deadline.threshold_percent,
+                "detected_late_seconds": late,
+            }
 
-    Returns whether a notification row was created. A deadline whose notification
-    already exists still gets marked fired — that is a replay, and the point of
-    the idempotency key is that a replay is uneventful.
-    """
-    from disputeshield.tenancy.middleware import db_tenant_context
-
-    with transaction.atomic(), db_tenant_context(deadline.tenant_id):
-        # Re-read under the lock: another worker may have fired it between the
-        # claim and here.
-        current = SLADeadline.objects.all_tenants().select_for_update().get(pk=deadline.pk)
-        if current.fired_at is not None:
-            return False
-
-        current.fired_at = now
-        current.save(update_fields=["fired_at"])
-
-        clock = current.clock
-        breached = current.kind in {
-            SLADeadline.Kind.ACKNOWLEDGEMENT,
-            SLADeadline.Kind.RESOLUTION,
-        }
-        _record(
-            clock,
-            SLAEvent.Kind.BREACHED if breached else SLAEvent.Kind.WARNED,
-            occurred_at=now,
-            actor_type="system",
-            payload={
-                "deadline_kind": current.kind,
-                "threshold_percent": current.threshold_percent,
-                # §11.5 step 5: a breach detected late must say so, so that the
-                # lateness is attributable to the systems cause rather than to
-                # the handling of the case.
-                "detected_late_seconds": max(0, int((now - current.fires_at).total_seconds())),
-            },
-        )
-
-        _, created = NotificationOutbox.objects.get_or_create(
-            tenant=clock.tenant,
-            idempotency_key=idempotency_key(current),
-            defaults={
-                "event_type": f"sla.{current.kind}",
-                "payload": {
-                    "clock_id": clock.pk,
+            events.append(
+                SLAEvent(
+                    tenant=tenant,
+                    clock=clock,
+                    kind=kind,
+                    actor_type="system",
+                    clock_remaining_seconds=0,
+                    occurred_at=now,
+                )
+            )
+            audit_entries.append(
+                {
+                    "event_type": f"sla.{kind}",
                     "subject_type": clock.subject_type,
                     "subject_id": clock.subject_id,
-                    "kind": current.kind,
-                    "threshold_percent": current.threshold_percent,
-                    "due_at": current.fires_at.isoformat(),
-                    "remaining_seconds": remaining_seconds(clock, at=now),
-                },
-            },
+                    "actor_type": "system",
+                    "occurred_at": now,
+                    "payload": payload,
+                }
+            )
+            notifications.append(
+                NotificationOutbox(
+                    tenant=tenant,
+                    idempotency_key=idempotency_key(deadline),
+                    event_type=f"sla.{deadline.kind}",
+                    payload={
+                        "clock_id": clock.pk,
+                        "subject_type": clock.subject_type,
+                        "subject_id": clock.subject_id,
+                        "kind": deadline.kind,
+                        "threshold_percent": deadline.threshold_percent,
+                        "due_at": deadline.fires_at.isoformat(),
+                    },
+                )
+            )
+
+        SLADeadline.objects.bulk_update(batch, ["fired_at"], batch_size=1000)
+        SLAEvent.objects.bulk_create(events, batch_size=1000)
+        # `ignore_conflicts` makes a replay uneventful: the unique idempotency key
+        # is what turns a second delivery attempt into a no-op rather than a
+        # second page at 03:00.
+        created = NotificationOutbox.objects.bulk_create(
+            notifications, batch_size=1000, ignore_conflicts=True
         )
-        return created
+        audit.append_batch(tenant=tenant, entries=audit_entries)
+
+        return len(batch), len(created)
 
 
 def _beat(now: datetime, duration_ms: int, fired: int) -> None:

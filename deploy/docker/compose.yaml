@@ -1,0 +1,74 @@
+# Self-hosted DisputeShield (§6.3).
+#
+# Two constraints here are compliance failures rather than availability ones, and
+# both are easy to "simplify" away:
+#
+#   * **Beat runs exactly one replica**, holding a leader lock. Two schedulers
+#     double-fire every task, which in this product means a duplicate breach page
+#     at 03:00 — followed by an alert nobody trusts.
+#   * **The broker and the cache are separate Redis instances.** A cache flush
+#     must not be capable of destroying the SLA sweep's task queue.
+
+name: disputeshield
+
+x-app: &app
+  image: ghcr.io/disputeshield/disputeshield:1.0.0
+  env_file: [.env]
+  depends_on:
+    postgres: {condition: service_healthy}
+    redis-broker: {condition: service_started}
+  restart: unless-stopped
+
+services:
+  web:
+    <<: *app
+    command: >-
+      gunicorn server.wsgi:application --bind 0.0.0.0:8000
+      --worker-class gevent --workers 4 --graceful-timeout 30
+    ports: ["8000:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/readyz')"]
+      interval: 15s
+      timeout: 3s
+
+  # Short, latency-sensitive work. Its own pool so nothing in §11.3's SLO can
+  # queue behind a slow notification or a virus scan.
+  worker-sla:
+    <<: *app
+    command: celery -A server.celery worker -Q sla -c 4 --max-tasks-per-child 500
+
+  worker-notify:
+    <<: *app
+    command: celery -A server.celery worker -Q notify -c 8 --max-tasks-per-child 500
+
+  beat:
+    <<: *app
+    command: celery -A server.celery beat --loglevel INFO
+    deploy:
+      replicas: 1  # never raise this — see the note at the top of this file
+
+  postgres:
+    image: postgres:16-alpine
+    env_file: [.env]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+
+  redis-broker:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [brokerdata:/data]
+    restart: unless-stopped
+
+  redis-cache:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  brokerdata:

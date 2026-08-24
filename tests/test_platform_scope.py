@@ -162,3 +162,65 @@ class TestThePattern:
             f"{missing} query across tenants without iterating them — row level "
             "security will return nothing when Celery calls them"
         )
+
+
+class TestTheTransactionRequirement:
+    """`SET LOCAL` outside a transaction is discarded, silently.
+
+    Postgres warns and continues. The variable is never set, row level security
+    matches nothing, every query returns zero rows, and nothing raises. That shape
+    of bug appeared three times in this codebase — the SLA sweep, the attachment
+    download, and the packaged-install smoke test — before it was made loud.
+    """
+
+    @pytest.mark.django_db(transaction=True)
+    def test_setting_the_context_outside_a_transaction_raises(self, tenant_a):
+        from disputeshield.tenancy.middleware import NoTransaction, set_tenant_context
+
+        with pytest.raises(NoTransaction, match="discarded"):
+            set_tenant_context(tenant_a.pk)
+
+    @pytest.mark.django_db(transaction=True)
+    def test_for_each_tenant_opens_its_own_transaction(self, tenant_a, tenant_b):
+        """A Celery task runs in autocommit, so the helper cannot assume one."""
+        from disputeshield.tenancy.platform import for_each_tenant
+
+        seen = list(for_each_tenant(lambda tenant_id: tenant_id))
+        assert set(seen) == {tenant_a.pk, tenant_b.pk}
+
+    @pytest.mark.django_db(transaction=True)
+    def test_one_tenants_failure_does_not_roll_back_the_others(
+        self, tenant_a, tenant_b, make_policy, as_tenant
+    ):
+        """One transaction per tenant, not one for the loop: a failure sweeping
+        the eleventh tenant must not undo the ten before it."""
+        from django.db import transaction
+
+        from disputeshield.models import NotificationOutbox
+        from disputeshield.tenancy.platform import for_each_tenant
+
+        # `Tenant` orders by name, so which tenant comes first is a property of
+        # the fixture data rather than of the ids. The test records what it saw
+        # instead of predicting it.
+        succeeded: list[str] = []
+
+        def work(tenant_id):
+            NotificationOutbox.objects.create(
+                tenant_id=tenant_id, idempotency_key="k", event_type="e", payload={}
+            )
+            if succeeded:
+                raise RuntimeError("this tenant blew up")
+            succeeded.append(tenant_id)
+            return tenant_id
+
+        with pytest.raises(RuntimeError):
+            list(for_each_tenant(work))
+
+        assert len(succeeded) == 1
+        kept = tenant_a if tenant_a.pk == succeeded[0] else tenant_b
+        rolled_back = tenant_b if kept is tenant_a else tenant_a
+
+        with transaction.atomic(), as_tenant(kept):
+            assert NotificationOutbox.objects.count() == 1, "a committed tenant lost its work"
+        with transaction.atomic(), as_tenant(rolled_back):
+            assert NotificationOutbox.objects.count() == 0, "the failed tenant kept a partial write"

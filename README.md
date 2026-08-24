@@ -453,7 +453,9 @@ diverge, CI is lying.
 ### The gates that never go yellow
 
 ```bash
-make gates
+make gates       # the blocking suites
+make packaging   # wheel -> bare project -> init -> doctor -> file a dispute
+make browser     # iframe isolation, keyboard-only filing, axe
 ```
 
 | Gate | Asserts |
@@ -480,7 +482,7 @@ Thirteen phases, each with an exit gate a machine checks.
 
 | Phases | Delivers | Version |
 |---|---|---|
-| 0–6 | The product as specified: widget, SLA engine, agent workspace, audit trail, regulatory export, packaging | **v1.0** |
+| 0–6 | The product as specified: widget, SLA engine, agent workspace, audit trail, regulatory export, packaging | **v1.0 — shipped** |
 | 7 | Every complaint lands in the clock — omnichannel intake, deflection, mass-incident mode | v1.1 |
 | 8 | Evidence that survives a lawyer — legal hold, chain anchoring, external escalation, regulatory returns | v1.2 |
 | 9 | The money side — representment packs, provider connectors, financial exposure | v1.3 |

@@ -83,7 +83,9 @@ def scan_attachment(attachment_id: str) -> str:
 
     attachment = DisputeAttachment.objects.all_tenants().get(pk=attachment_id)
 
-    with db_tenant_context(attachment.tenant_id):
+    from django.db import transaction
+
+    with transaction.atomic(), db_tenant_context(attachment.tenant_id):
         content = storage.get(attachment.storage_key)
         verdict = get_scanner().scan(content)
 

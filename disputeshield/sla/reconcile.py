@@ -54,7 +54,9 @@ def reconcile(*, tenant_id: str | None = None) -> ReconcileResult:
     from disputeshield.tenancy.platform import for_each_tenant
 
     if tenant_id:
-        with db_tenant_context(tenant_id):
+        from django.db import transaction
+
+        with transaction.atomic(), db_tenant_context(tenant_id):
             return _reconcile_one_tenant()
 
     checked = 0

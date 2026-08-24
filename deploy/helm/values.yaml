@@ -1,0 +1,42 @@
+image:
+  repository: ghcr.io/disputeshield/disputeshield
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+web:
+  replicas: 3
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetRequestsPerSecond: 200
+
+workers:
+  # Separate pools (§11.1). The sla queue carries the sweep, and §11.3's SLO is
+  # on sweep freshness — sharing a pool makes that SLO a function of how fast an
+  # email provider happens to be responding.
+  sla:
+    replicas: 2
+    concurrency: 4
+  notify:
+    replicas: 2
+    concurrency: 8
+
+beat:
+  # Exactly one. Two schedulers double-fire every task, and in this product that
+  # is a duplicate breach page at 03:00. The template hard-codes 1 and ignores
+  # any other value — a chart that lets you set 2 is a chart that will be set to 2.
+  leaderLockTtlSeconds: 60
+
+# terminationGracePeriodSeconds exceeds the drain budget (§8.6 principle 5).
+terminationGracePeriodSeconds: 45
+
+secrets:
+  # Never literals. Injected from the cluster's secret manager (§8.5).
+  existingSecret: disputeshield
+
+probes:
+  liveness: /healthz
+  # Readiness includes the audit immutability trigger: a pod that can accept
+  # writes but cannot make them immutable should not be taking traffic.
+  readiness: /readyz

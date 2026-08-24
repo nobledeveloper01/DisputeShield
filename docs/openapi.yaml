@@ -1,139 +1,933 @@
 openapi: 3.1.0
-
 info:
   title: DisputeShield API
-  version: 0.1.0
-  description: |
-    Embeddable dispute and SLA management for fintechs.
-
-    Three surfaces, three authentication schemes, deliberately not interchangeable:
-
-      * **Server API** — your backend, secret key. Mints session tokens.
-      * **Widget API** — the browser, session token. Scoped to exactly one customer.
-      * **Management API** — your agents, dashboard session or agent-scoped key.
-
-    Cross-boundary access returns **404, never 403**: a 403 confirms that the
-    resource exists, which is an information leak (§8.1).
-
-    Endpoints are added per phase. See docs/ROADMAP.md.
+  version: 1.0.0
+  description: "Embeddable dispute and SLA management for fintechs.\n\nThree surfaces, three authentication\
+    \ schemes, deliberately not interchangeable:\n\n  * **Server API** — your backend, secret key. Mints\
+    \ session tokens.\n  * **Widget API** — the browser, session token. Scoped to exactly one customer.\n\
+    \  * **Management API** — your agents, an agent-scoped key plus an acting-agent header.\n\nTwo rules\
+    \ apply everywhere and are worth stating once:\n\n  * **Cross-boundary access returns 404, never 403.**\
+    \ A 403 confirms the resource\n    exists, which is an information leak (§8.1). This includes a role\
+    \ that is not\n    permitted to use an endpoint — answering 403 there confirms the endpoint is real.\n\
+    \  * **Every write requires `Idempotency-Key`.** Not optional: an optional key means\n    the guarantee\
+    \ silently does not apply to the callers who most need it, and they\n    have no way to tell. Replaying\
+    \ a key returns the original response; reusing one\n    with a different body is a 409, because returning\
+    \ the first response would hide\n    a client bug.\n"
   license:
     name: BUSL-1.1
     url: https://github.com/nobledeveloper01/DisputeShield/blob/main/LICENSE
-
 servers:
-  - url: https://api.disputeshield.dev
-    description: Hosted
-  - url: http://localhost:8000
-    description: Local
-
+- url: https://api.disputeshield.dev
+  description: Hosted
+- url: http://localhost:8000
+  description: Local
 security:
-  - secretKey: []
-
+- secretKey: []
 components:
   securitySchemes:
     secretKey:
       type: http
       scheme: bearer
-      description: |
-        `ds_{env}_{random32}`. Server-side only. Argon2id-hashed at rest; shown
+      description: '`ds_{env}_{random32}`. Server-side only. Argon2id-hashed at rest; shown
+
         once at creation and never retrievable. Scoped to one environment and one
+
         tenant — no key spans tenants.
+
+        '
     sessionToken:
       type: http
       scheme: bearer
-      description: |
-        `dst_...`. Minted by your backend via POST /v1/sessions, scoped to exactly
+      description: '`dst_...`. Minted by your backend via POST /v1/sessions, scoped to exactly
+
         one customer_ref, 30-minute TTL, revocable (ADR-0002). The publishable key
+
         cannot substitute for this on any data endpoint.
 
+        '
+    publishableKey:
+      type: http
+      scheme: bearer
+      description: '`pk_{env}_{random32}`. Safe to embed in a public page: it can read widget configuration
+        and theming and nothing else. There is no code path from a publishable key to a dispute record,
+        and the widget suite asserts that against every data route rather than a sample.'
+    agentKey:
+      type: http
+      scheme: bearer
+      description: 'A secret key, plus `X-DisputeShield-Acting-Agent` naming the person the call is made
+        for. The audit trail records that person rather than the key: "an API key resolved this case"
+        is not an answer a supervisor accepts.'
   schemas:
     Error:
       type: object
-      required: [error]
+      required:
+      - error
       properties:
         error:
           type: object
-          required: [type, message]
+          required:
+          - type
+          - message
           properties:
-            type: { type: string, example: not_found }
-            message: { type: string }
-            request_id: { type: string }
-
+            type:
+              type: string
+              example: not_found
+            message:
+              type: string
+            request_id:
+              type: string
     Transaction:
       type: object
-      required: [reference, occurred_at]
+      required:
+      - reference
+      - occurred_at
       properties:
-        reference: { type: string, maxLength: 128 }
+        reference:
+          type: string
+          maxLength: 128
         amount_minor:
           type: integer
           format: int64
           description: Integer minor units. Never a float — money is not a float.
-        currency: { type: string, minLength: 3, maxLength: 3 }
-        occurred_at: { type: string, format: date-time }
-        description: { type: string }
-        status: { type: string }
-
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        occurred_at:
+          type: string
+          format: date-time
+        description:
+          type: string
+        status:
+          type: string
     SessionRequest:
       type: object
-      required: [customer_ref]
+      required:
+      - customer_ref
       properties:
         customer_ref:
           type: string
-          description: |
-            Your identifier for this customer. Stored only as a per-tenant salted
-            hash (§8.4). The session's entire visibility scope is decided here, on
+          description: 'Your identifier for this customer. Stored only as a per-tenant salted
+
+            hash (§8.4). The session''s entire visibility scope is decided here, on
+
             your backend, where identity is actually known.
-        display_name: { type: string, maxLength: 128 }
+
+            '
+        display_name:
+          type: string
+          maxLength: 128
         transactions:
           type: array
-          items: { $ref: '#/components/schemas/Transaction' }
-          description: |
-            Supplied by you at mint time. DisputeShield never queries your
-            database and holds no standing access to it.
-        ttl_seconds: { type: integer, default: 1800, maximum: 3600 }
+          items:
+            $ref: '#/components/schemas/Transaction'
+          description: 'Supplied by you at mint time. DisputeShield never queries your
 
+            database and holds no standing access to it.
+
+            '
+        ttl_seconds:
+          type: integer
+          default: 1800
+          maximum: 3600
     SessionResponse:
       type: object
       properties:
-        session_token: { type: string, example: dst_9f2a7c... }
-        expires_at: { type: string, format: date-time }
-
+        session_token:
+          type: string
+          example: dst_9f2a7c...
+        expires_at:
+          type: string
+          format: date-time
+    Dispute:
+      type: object
+      properties:
+        id:
+          type: string
+          example: dsp_9F2A7C…
+        reference:
+          type: string
+          example: DS-2026-8AJNKJ
+        customer_ref_hash:
+          type: string
+          description: Per-tenant salted HMAC. The raw reference is never stored (§8.4).
+        category:
+          type: string
+        status:
+          type: string
+          enum:
+          - submitted
+          - acknowledged
+          - investigating
+          - awaiting_customer
+          - escalated
+          - resolved
+          - reopened
+          - closed
+          - auto_closed
+        outcome:
+          type: string
+          enum:
+          - ''
+          - upheld
+          - rejected
+          - partial
+          - withdrawn
+        amount_minor:
+          type: integer
+          format: int64
+          description: Integer minor units. Money is not a float.
+        refund_amount_minor:
+          type: integer
+          format: int64
+          nullable: true
+          description: Recorded, never executed. DisputeShield has no code path to a payment (§3.3).
+        ack_deadline:
+          type: string
+          format: date-time
+        resolution_deadline:
+          type: string
+          format: date-time
+        breach_ack:
+          type: boolean
+        breach_resolution:
+          type: boolean
+        sla:
+          $ref: '#/components/schemas/SLABlock'
+    SLABlock:
+      type: object
+      description: The list view reports deadlines and breach flags only. Business-time remaining needs
+        the calendar, the pause intervals and a deadline row per case, and fifty of those per page put
+        the queue over its 300ms budget — so it is computed on the detail view, where it is one case.
+      properties:
+        state:
+          type: string
+          enum:
+          - running
+          - paused
+          - stopped
+        breached:
+          type: boolean
+        ack_deadline:
+          type: string
+          format: date-time
+        resolution_deadline:
+          type: string
+          format: date-time
+        remaining_seconds:
+          type: integer
+          description: Detail view only. Negative once breached.
+    WidgetDispute:
+      type: object
+      description: What the customer sees. Shares no base class with the management serializer — inheritance
+        is how a field added for agents silently appears in a customer response, and the leakage gate
+        walks the full field graph to prove it cannot.
+      properties:
+        id:
+          type: string
+        reference:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        expected_resolution_at:
+          type: string
+          format: date-time
+          description: Quoted to the customer at filing. The commitment is a regulatory quantity, so they
+            hear it from us rather than from silence.
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/WidgetMessage'
+    WidgetMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        author:
+          type: string
+          enum:
+          - you
+          - support
+          description: Never a named employee. A customer learns the firm replied, which is all they need.
+        body:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    Attachment:
+      type: object
+      properties:
+        id:
+          type: string
+        filename:
+          type: string
+        content_type:
+          type: string
+        size_bytes:
+          type: integer
+        sha256:
+          type: string
+        scan_status:
+          type: string
+          enum:
+          - pending
+          - clean
+          - infected
+          - failed
+          description: Nothing is retrievable until `clean`, including by whoever uploaded it.
+    Attestation:
+      type: object
+      description: Two facts, reported separately. The chain proves internal consistency; the signature
+        proves we computed it. Neither proves *when* the chain existed — external anchoring is planned
+        (amplifier A8).
+      properties:
+        chain:
+          type: object
+          properties:
+            verified:
+              type: boolean
+            records_checked:
+              type: integer
+            first_break:
+              type: integer
+              nullable: true
+        attestation:
+          type: object
+          properties:
+            present:
+              type: boolean
+            signature_valid:
+              type: boolean
+              nullable: true
+            head_hash:
+              type: string
+            externally_anchored:
+              type: boolean
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        maxLength: 128
+      description: Required on every write. See the note in the API description.
+    PeriodFrom:
+      name: from
+      in: query
+      schema:
+        type: string
+        format: date-time
+    PeriodTo:
+      name: to
+      in: query
+      schema:
+        type: string
+        format: date-time
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+      description: Opaque cursor. Offset pagination over a queue that reorders itself skips cases, which
+        is a defect on a queue whose purpose is that nothing is missed.
 paths:
   /v1/sessions:
     post:
       summary: Mint a customer-scoped session token
       operationId: createSession
-      security: [{ secretKey: [] }]
+      security:
+      - secretKey: []
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/SessionRequest' }
+            schema:
+              $ref: '#/components/schemas/SessionRequest'
       responses:
         '201':
           description: Created
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/SessionResponse' }
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
         '401':
           description: Missing, malformed or revoked secret key
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-
+              schema:
+                $ref: '#/components/schemas/Error'
   /healthz:
     get:
       summary: Liveness
       operationId: healthz
       security: []
       responses:
-        '200': { description: Alive }
-
+        '200':
+          description: Alive
   /readyz:
     get:
       summary: Readiness — database, both Redis instances, audit trigger present
       operationId: readyz
       security: []
       responses:
-        '200': { description: Ready }
-        '503': { description: A dependency is unavailable or the audit trigger is missing }
+        '200':
+          description: Ready
+        '503':
+          description: A dependency is unavailable or the audit trigger is missing
+  /v1/widget/config:
+    get:
+      summary: Theme, categories and locale
+      operationId: widgetConfig
+      security:
+      - publishableKey: []
+      responses:
+        '200':
+          description: Configuration. Everything here is safe to disclose.
+  /v1/embed:
+    get:
+      summary: The sandboxed iframe document
+      description: Dynamic and privately cached, carrying the tenant's own `frame-ancestors`. The bundles
+        it references are static and cached for a year. Caching this document publicly would hand one
+        tenant another tenant's frame-ancestors.
+      operationId: embed
+      security:
+      - publishableKey: []
+      parameters:
+      - name: k
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The widget document, with a per-tenant CSP.
+        '403':
+          description: Unknown key or unregistered origin. Empty body — the widget fails closed and quietly,
+            never rendering an error on the host page (§8.6).
+  /v1/widget/disputes:
+    get:
+      summary: This customer's cases
+      operationId: widgetListDisputes
+      security:
+      - sessionToken: []
+      responses:
+        '200':
+          description: Cases in the token's scope, and no others.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WidgetDispute'
+    post:
+      summary: File a dispute
+      operationId: widgetFileDispute
+      security:
+      - sessionToken: []
+      parameters:
+      - &id001
+        $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Filed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WidgetDispute'
+        '400':
+          description: Unknown category, or a transaction reference outside the session — a customer may
+            only dispute transactions their own backend supplied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/widget/disputes/transactions:
+    get:
+      summary: The transaction picker's options
+      operationId: widgetTransactions
+      security:
+      - sessionToken: []
+      description: Straight from the minted session, so only this customer's appear.
+      responses:
+        '200':
+          description: Transactions supplied at mint time.
+  /v1/disputes:
+    get:
+      summary: The queue
+      operationId: listDisputes
+      security:
+      - agentKey: []
+      description: Sorted by time remaining, breached cases pinned. An agent who has to sort a queue to
+        find urgent work is using a table, not a queue.
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - name: status
+        in: query
+        schema:
+          type: string
+      - name: category
+        in: query
+        schema:
+          type: string
+      - name: assigned_to
+        in: query
+        schema:
+          type: string
+        description: '`none` for unassigned.'
+      - name: sla_risk
+        in: query
+        schema:
+          type: string
+          enum:
+          - breached
+          - at_risk
+      - name: amount_min
+        in: query
+        schema:
+          type: integer
+      - name: amount_max
+        in: query
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: A page of the queue.
+  /v1/disputes/{id}:
+    get:
+      summary: A case, with its conversation and clock history
+      operationId: getDispute
+      security:
+      - agentKey: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The case.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dispute'
+        '404': &id002
+          description: No such resource — or one you may not see. The two are deliberately indistinguishable
+            (§8.1).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/disputes/{id}/transition:
+    post:
+      summary: Move a case through the lifecycle
+      operationId: disputeTransition
+      description: Refused with 409 and the legal moves if the transition table does not permit it.
+      security:
+      - agentKey: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+      responses:
+        '200':
+          description: Applied.
+        '201':
+          description: Created.
+        '400':
+          description: Invalid request, or a required reason was omitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Illegal transition, or an idempotency key reused with a different body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404': *id002
+  /v1/disputes/{id}/pause:
+    post:
+      summary: Pause the resolution clock
+      operationId: disputePause
+      description: 'A reason is required and is not defaulted: a pausable clock is an abusable clock,
+        and a defaulted reason is an optional reason at every call site (§4.4 C3).'
+      security:
+      - agentKey: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+      responses:
+        '200':
+          description: Applied.
+        '201':
+          description: Created.
+        '400':
+          description: Invalid request, or a required reason was omitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Illegal transition, or an idempotency key reused with a different body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404': *id002
+  /v1/disputes/{id}/resume:
+    post:
+      summary: Resume the clock
+      operationId: disputeResume
+      description: A reason is required, for the same purpose as a pause.
+      security:
+      - agentKey: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+      responses:
+        '200':
+          description: Applied.
+        '201':
+          description: Created.
+        '400':
+          description: Invalid request, or a required reason was omitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Illegal transition, or an idempotency key reused with a different body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404': *id002
+  /v1/disputes/{id}/resolve:
+    post:
+      summary: Record an outcome
+      operationId: disputeResolve
+      description: Records `refund_amount_minor`. Never moves money — that is permanently out of scope
+        and phase 9 adds a call-graph gate asserting no module reaches a payment path.
+      security:
+      - agentKey: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+      responses:
+        '200':
+          description: Applied.
+        '201':
+          description: Created.
+        '400':
+          description: Invalid request, or a required reason was omitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Illegal transition, or an idempotency key reused with a different body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404': *id002
+  /v1/disputes/{id}/assign:
+    post:
+      summary: Assign or unassign
+      operationId: disputeAssign
+      description: ''
+      security:
+      - agentKey: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+      responses:
+        '200':
+          description: Applied.
+        '201':
+          description: Created.
+        '400':
+          description: Invalid request, or a required reason was omitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Illegal transition, or an idempotency key reused with a different body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404': *id002
+  /v1/disputes/{id}/messages:
+    post:
+      summary: Read or add a message
+      operationId: disputeMessages
+      description: An internal note is structurally incapable of reaching the widget (§10).
+      security:
+      - agentKey: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+      responses:
+        '200':
+          description: Applied.
+        '201':
+          description: Created.
+        '400':
+          description: Invalid request, or a required reason was omitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Illegal transition, or an idempotency key reused with a different body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404': *id002
+  /v1/disputes/{id}/context:
+    post:
+      summary: Push transaction context
+      operationId: disputeContext
+      description: Pushed by your backend, never pulled. DisputeShield holds no standing access to your
+        database, and an endpoint that reached back for data would retire that claim.
+      security:
+      - agentKey: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+      responses:
+        '200':
+          description: Applied.
+        '201':
+          description: Created.
+        '400':
+          description: Invalid request, or a required reason was omitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Illegal transition, or an idempotency key reused with a different body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404': *id002
+  /v1/disputes/{id}/attachments:
+    post:
+      summary: Upload or list attachments
+      operationId: disputeAttachments
+      description: Typed by magic bytes, capped at 10 MB, and not retrievable until scanned clean.
+      security:
+      - agentKey: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+      responses:
+        '200':
+          description: Applied.
+        '201':
+          description: Created.
+        '400':
+          description: Invalid request, or a required reason was omitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Illegal transition, or an idempotency key reused with a different body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404': *id002
+  /v1/disputes/{id}/render_template:
+    post:
+      summary: Render a response template against this case
+      operationId: disputeRenderTemplate
+      description: Rendering never sends. The agent stays the author of whatever goes out.
+      security:
+      - agentKey: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id001
+      responses:
+        '200':
+          description: Applied.
+        '201':
+          description: Created.
+        '400':
+          description: Invalid request, or a required reason was omitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Illegal transition, or an idempotency key reused with a different body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404': *id002
+  /v1/disputes/{id}/sla:
+    get:
+      summary: The clock, its deadlines and the policy version it runs on
+      operationId: disputeSla
+      security:
+      - agentKey: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Clock state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SLABlock'
+        '404': *id002
+  /v1/attachments/{id}:
+    get:
+      summary: Download an attachment
+      operationId: downloadAttachment
+      security: []
+      description: 'Signed and expiring: the signature is the authorisation, which is what lets a link
+        be handed to a browser that will not send an API key. Served as `application/octet-stream` with
+        `Content-Disposition: attachment`, `nosniff` and a deny-everything CSP — never as its own content
+        type.'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: tenant
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: expires
+        in: query
+        required: true
+        schema:
+          type: integer
+      - name: signature
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The file.
+        '404':
+          description: 'Missing, expired, unsigned, or not yet scanned clean. Deliberately indistinguishable:
+            saying "not scanned yet" tells an uploader when to retry.'
+  /v1/analytics/sla-performance:
+    get:
+      summary: Breach analysis by category or agent
+      operationId: slaPerformance
+      security:
+      - agentKey: []
+      description: 'Pause duration is reported beside breaches rather than on its own screen: §4.4''s
+        argument is that a pausable clock is abusable, and the abuse is only visible in the comparison.'
+      parameters:
+      - $ref: '#/components/parameters/PeriodFrom'
+      - $ref: '#/components/parameters/PeriodTo'
+      - name: group_by
+        in: query
+        schema:
+          type: string
+          enum:
+          - category
+          - agent
+      responses:
+        '200':
+          description: Summary, rows and breach causes.
+  /v1/reports/regulatory:
+    get:
+      summary: The regulator-ready export
+      operationId: regulatoryReport
+      security:
+      - agentKey: []
+      description: 'Compliance role only: an export is a disclosure of every case in the period. Returns
+        a zip of `cases.csv`, `history.csv` and `manifest.json`. **Byte-reproducible** — a supervisor
+        who asks for the same period twice and gets two different files has a reason to doubt the rest
+        of it.'
+      parameters:
+      - $ref: '#/components/parameters/PeriodFrom'
+      - $ref: '#/components/parameters/PeriodTo'
+      - name: format
+        in: query
+        schema:
+          type: string
+          enum:
+          - zip
+          - json
+          default: zip
+      responses:
+        '200':
+          description: The bundle, or the manifest alone.
+        '404': *id002
+  /v1/audit/verify:
+    get:
+      summary: Verify the audit chain
+      operationId: auditVerify
+      security:
+      - agentKey: []
+      description: Published so your auditor can check the claim independently. A proof only we can run
+        is a promise, not a proof.
+      responses:
+        '200':
+          description: Chain and attestation status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attestation'

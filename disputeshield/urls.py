@@ -12,6 +12,11 @@ from disputeshield.api.views_attachments import AttachmentDownloadView
 from disputeshield.api.views_embed import EmbedView
 from disputeshield.api.views_health import healthz, readyz
 from disputeshield.api.views_management import DisputeViewSet
+from disputeshield.api.views_reports import (
+    AuditVerifyView,
+    RegulatoryReportView,
+    SLAPerformanceView,
+)
 from disputeshield.api.views_widget import (
     SessionView,
     WidgetConfigView,
@@ -40,5 +45,8 @@ urlpatterns = [
         name="attachment-download",
     ),
     path("v1/widget/", include(widget_router.urls)),
+    path("v1/analytics/sla-performance", SLAPerformanceView.as_view(), name="sla-performance"),
+    path("v1/reports/regulatory", RegulatoryReportView.as_view(), name="regulatory-report"),
+    path("v1/audit/verify", AuditVerifyView.as_view(), name="audit-verify"),
     path("v1/", include(router.urls)),
 ]

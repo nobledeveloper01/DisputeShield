@@ -41,6 +41,16 @@ class TenantMismatch(RuntimeError):
     """
 
 
+def _require_actor(actor_type: str, actor_id: str) -> None:
+    if actor_type not in ACTOR_TYPES:
+        raise ActorRequired(
+            f"actor_type must be one of {'|'.join(sorted(ACTOR_TYPES))}, got {actor_type!r}. "
+            "Every audit record names who acted, including the scheduler."
+        )
+    if actor_type != "system" and not actor_id:
+        raise ActorRequired("A non-system actor must carry an actor_id.")
+
+
 def append(
     *,
     tenant: Tenant,
@@ -59,13 +69,7 @@ def append(
     # recording them as `api_key` would attribute the customer's own words to the
     # fintech's integration. They are identified by their pseudonymous
     # `customer_ref_hash`, which is attributable without being identifying.
-    if actor_type not in ACTOR_TYPES:
-        raise ActorRequired(
-            f"actor_type must be one of {'|'.join(sorted(ACTOR_TYPES))}, got {actor_type!r}. "
-            "Every audit record names who acted, including the scheduler."
-        )
-    if actor_type != "system" and not actor_id:
-        raise ActorRequired("A non-system actor must carry an actor_id.")
+    _require_actor(actor_type, actor_id)
 
     active = context.get()
     if active is not None and active != tenant.pk:
@@ -106,6 +110,70 @@ def append(
         record.hash = compute_hash(record_content(record), prev_hash)
         record.save(force_insert=True)
         return record
+
+
+def append_batch(*, tenant: Tenant, entries: list[dict]) -> list[AuditRecord]:
+    """Append many records under a single advisory lock acquisition.
+
+    ADR-0003 anticipated this: the lock is what makes the chain safe, and taking
+    it once per record is what makes a fan-out expensive. Ten thousand deadlines
+    firing in one sweep cost ten thousand lock acquisitions, ten thousand head
+    reads and ten thousand transactions — 75 seconds against §11.9's 60-second
+    budget, caught by `tests/test_sweep_at_load.py`.
+
+    The chain is built exactly as `append` builds it, one link at a time, so a
+    batch of ten is indistinguishable from ten appends to anything that later
+    verifies it. What changes is only how often we pay for the lock.
+    """
+    if not entries:
+        return []
+
+    active = context.get()
+    if active is not None and active != tenant.pk:
+        raise TenantMismatch(
+            f"Cannot append audit records for tenant {tenant.pk} while the active "
+            f"tenant context is {active}."
+        )
+
+    for entry in entries:
+        _require_actor(entry.get("actor_type", ""), entry.get("actor_id", ""))
+
+    with transaction.atomic(), db_tenant_context(tenant.pk):
+        _lock_tenant(tenant)
+        head = (
+            AuditRecord.objects.all_tenants()
+            .filter(tenant_id=tenant.pk)
+            .order_by("-sequence")
+            .values("sequence", "hash")
+            .first()
+        )
+        sequence = (head["sequence"] + 1) if head else 1
+        prev_hash = head["hash"] if head else GENESIS
+
+        records = []
+        now = timezone.now()
+        for entry in entries:
+            record = AuditRecord(
+                tenant=tenant,
+                sequence=sequence,
+                event_type=entry["event_type"],
+                occurred_at=entry.get("occurred_at") or now,
+                actor_type=entry["actor_type"],
+                actor_id=entry.get("actor_id", ""),
+                actor_ip=entry.get("actor_ip"),
+                subject_type=entry["subject_type"],
+                subject_id=entry["subject_id"],
+                payload=entry.get("payload") or {},
+                corrects=entry.get("corrects", ""),
+                prev_hash=prev_hash,
+            )
+            record.hash = compute_hash(record_content(record), prev_hash)
+            prev_hash = record.hash
+            sequence += 1
+            records.append(record)
+
+        AuditRecord.objects.bulk_create(records, batch_size=1000)
+        return records
 
 
 def correct(

@@ -38,20 +38,30 @@ def _let_the_test_harness_flush_the_audit_table(django_db_setup, django_db_block
     operations_class = type(connection.ops)
     original = operations_class.sql_flush
 
+    # Every table carrying an append-only guard. Derived from a list rather than
+    # hard-coded once, because phase 6 added a second such table and the patch
+    # that only knew about the first failed the whole suite's teardown.
+    guarded = ("disputeshield_auditrecord", "disputeshield_auditcheckpoint")
+
     def sql_flush(self, style, tables, *args, **kwargs):
         statements = original(self, style, tables, *args, **kwargs)
-        if any("auditrecord" in table for table in tables):
-            # Both guards have to be lifted, and that is worth noticing: the
-            # first attempt fails on the revoked grant, not on the trigger.
-            statements = [
-                "GRANT TRUNCATE ON disputeshield_auditrecord TO CURRENT_USER",
-                "ALTER TABLE disputeshield_auditrecord "
-                "DISABLE TRIGGER disputeshield_auditrecord_no_truncate",
-                *statements,
-                "ALTER TABLE disputeshield_auditrecord "
-                "ENABLE TRIGGER disputeshield_auditrecord_no_truncate",
-                "REVOKE TRUNCATE ON disputeshield_auditrecord FROM CURRENT_USER",
-            ]
+        present = [name for name in guarded if any(name == table for table in tables)]
+        if present:
+            # Both guards have to be lifted per table, and that is worth
+            # noticing: the first attempt fails on the revoked grant, not on the
+            # trigger.
+            before = []
+            after = []
+            for name in present:
+                before += [
+                    f"GRANT TRUNCATE ON {name} TO CURRENT_USER",
+                    f"ALTER TABLE {name} DISABLE TRIGGER {name}_no_truncate",
+                ]
+                after += [
+                    f"ALTER TABLE {name} ENABLE TRIGGER {name}_no_truncate",
+                    f"REVOKE TRUNCATE ON {name} FROM CURRENT_USER",
+                ]
+            statements = [*before, *statements, *after]
         return statements
 
     operations_class.sql_flush = sql_flush

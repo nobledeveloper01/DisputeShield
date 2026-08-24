@@ -7,7 +7,82 @@ All notable changes to this project are documented here. The format follows
 The PyPI package, the npm packages and the widget bundle are versioned together
 and released from one tag.
 
-## [Unreleased]
+## [1.0.0] — the specification, delivered
+
+Phases 0–6 of `docs/ROADMAP.md`. Everything §13 claims survives follow-up
+questions is built and gated: the sandboxed iframe, the server-minted
+customer-scoped session token, the pausable-clock-with-mandatory-reason, the
+dead-man's switch, and `disputeshield_doctor` verifying the immutability trigger
+actually installed.
+
+### Added — phase 6, analytics, export and packaging
+
+- Signed audit checkpoints. A failed verification still produces a checkpoint
+  marked unverified — silence after a failed check is indistinguishable from the
+  job not having run, and §11.4 pages on exactly that condition.
+- `GET /v1/audit/verify`, published so a customer's auditor can check the claim
+  independently. A proof only we can run is a promise, not a proof.
+- The regulatory export (§6.5): a zip of `cases.csv`, `history.csv` and a signed
+  `manifest.json`. **Byte-reproducible** — total ordering, fixed line
+  terminators, pinned archive timestamps, integer minor units and no float
+  anywhere. A supervisor who asks for the same period twice and gets two
+  different files has a reason to doubt the rest of the bundle.
+- The export reports a broken chain rather than hiding it. Producing a
+  clean-looking bundle from a tampered history is the worst thing this feature
+  could do, so there is a test for it.
+- Breach analysis by category, agent and **cause**, with pause duration reported
+  beside breaches rather than on its own screen — §4.4's argument is that a
+  pausable clock is abusable, and the abuse is only visible in the comparison.
+  Undocumented breaches surface as their own group, which is §11.5 step 5's
+  annotation earning its keep.
+- `disputeshield_init` now seeds real categories, a business calendar and five
+  SLA policies with their regulatory references.
+- Deployment artefacts: production compose, a Helm chart, a Terraform module.
+  The chart **hard-codes one beat replica** and uses a `Recreate` strategy — a
+  chart that exposes the number is one where somebody raises it during an
+  incident to clear a backlog, producing the duplicate breach pages they were
+  trying to avoid. Terraform pins the audit bucket to object lock in COMPLIANCE
+  mode, because GOVERNANCE mode can be overridden by exactly the principal an
+  evidence store has to survive.
+- `docs/openapi.yaml` complete: 23 paths, three authentication schemes, and the
+  404-not-403 and mandatory-idempotency rules stated once at the top.
+
+### Fixed — during phase 6
+
+- **The sweep missed §11.9's budget: 75.8s for 10,000 due deadlines against 60s.**
+  Claiming and firing were separate transactions, which made `SKIP LOCKED`
+  almost decorative — the claim's locks were released at its own commit, so every
+  row was re-locked a moment later — and each firing took its own
+  advisory-locked audit append. Now one transaction per tranche, bulk writes, and
+  `audit.append_batch` paying for the chain lock once instead of ten thousand
+  times. ADR-0003 anticipated this batching; the load gate is what forced it.
+- **`SET LOCAL` outside a transaction is discarded, silently.** Postgres warns and
+  continues, so the variable is never set, RLS matches nothing, and every query
+  returns zero rows with nothing raised. This was the *third* appearance of that
+  shape — the SLA sweep, the attachment download, and the packaged-install smoke
+  test — so `set_tenant_context` now raises `NoTransaction` instead of leaving it
+  to each caller to remember. `for_each_tenant` opens one transaction per tenant,
+  so a failure on the eleventh does not roll back the ten before it.
+- **A tenant-bearing model shipped with an unscoped default manager.**
+  `AuditCheckpoint` was written as a plain model on the reasoning that a platform
+  job reads it; the registry-walk test in `tests/test_tenant_isolation.py` failed
+  it immediately, which is what that test is for.
+- **Permissions were evaluated before the acting agent was resolved.** A role
+  admitting a bare API key passed the first check and was corrected by a second;
+  a compliance permission raised on the first and never reached the correction —
+  so a compliance officer was judged as the key they authenticated with. Now
+  resolved in `perform_authentication`, and the double-check is gone.
+
+### Gates added
+
+- **The packaging gate.** Builds a wheel, installs it into a bare Django project
+  in its own virtualenv, asserts the import came from `site-packages` rather than
+  the working tree, then runs `migrate` → `disputeshield_init` →
+  `disputeshield_doctor` → files a dispute → verifies the chain. §6.2 is a
+  distribution promise and this is what makes it testable as one.
+- The sweep load gate, and a second assertion that an *empty* sweep over 10,000
+  open clocks is still cheap — which is ADR-0007's actual claim: cost tracks
+  events due, not clocks open.
 
 ### Added — phase 5, attachments, templates and context
 
