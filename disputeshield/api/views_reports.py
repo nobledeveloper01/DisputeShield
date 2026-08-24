@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
@@ -17,7 +18,7 @@ from disputeshield import audit
 from disputeshield.api.mixins import ActingAgentMixin
 from disputeshield.api.permissions import CanChangeCompliancePolicy, CanReadOnly
 from disputeshield.audit.checkpoints import attestation
-from disputeshield.models import ReportRecipient
+from disputeshield.models import ReportRecipient, ReportSchedule
 from disputeshield.reports import analytics, delivery, regulatory
 
 UTC = UTC
@@ -212,6 +213,186 @@ class ReportRecipientDetailView(PeriodMixin, APIView):
                     payload={"address": recipient.address},
                 )
         return Response(_recipient(recipient))
+
+
+class ReportScheduleView(PeriodMixin, APIView):
+    """Monthly delivery of the export, unattended. Compliance-only, like the send.
+
+    A schedule is a standing instruction that a period leaves this system every
+    month, so creating one is the same decision as sending one — made once, for
+    every future month. Recipients must already be on the allowlist here too:
+    validating them at creation means a schedule cannot be set up pointing
+    somewhere it could never deliver.
+    """
+
+    permission_classes = [CanChangeCompliancePolicy]
+
+    def get(self, request):
+        return Response(
+            {"data": [_schedule(s) for s in ReportSchedule.objects.order_by("-is_active", "name")]}
+        )
+
+    def post(self, request):
+        name = (request.data.get("name") or "").strip()
+        reason = (request.data.get("reason") or "").strip()
+        addresses = request.data.get("recipients") or []
+        if isinstance(addresses, str):
+            addresses = [addresses]
+
+        if not name or not reason or not addresses:
+            return Response(
+                {
+                    "error": {
+                        "type": "invalid_request",
+                        "message": "name, reason and at least one recipient are required.",
+                    }
+                },
+                status=400,
+            )
+
+        try:
+            day = int(request.data.get("day_of_month", 5))
+            hour = int(request.data.get("hour", 6))
+        except (TypeError, ValueError):
+            return Response(
+                {
+                    "error": {
+                        "type": "invalid_request",
+                        "message": "day_of_month and hour must be whole numbers.",
+                    }
+                },
+                status=400,
+            )
+
+        if not 1 <= day <= 28:
+            return Response(
+                {
+                    "error": {
+                        "type": "invalid_request",
+                        "message": "day_of_month must be between 1 and 28. Days 29 to 31 do not "
+                        "exist in every month, and sliding silently to the last day would make a "
+                        "reporting deadline mean a different date in February.",
+                    }
+                },
+                status=400,
+            )
+        if not 0 <= hour <= 23:
+            return Response(
+                {"error": {"type": "invalid_request", "message": "hour must be between 0 and 23."}},
+                status=400,
+            )
+
+        zone_name = str(request.data.get("timezone") or "UTC")
+        try:
+            ZoneInfo(zone_name)
+        except (ZoneInfoNotFoundError, ValueError):
+            return Response(
+                {
+                    "error": {
+                        "type": "invalid_request",
+                        "message": f"Unknown timezone {zone_name!r}.",
+                    }
+                },
+                status=400,
+            )
+
+        try:
+            resolved = delivery.resolve_recipients(list(addresses))
+        except delivery.UnknownRecipient as exc:
+            # Checked now rather than at the first run. A schedule that cannot
+            # deliver should fail when somebody is looking at it, not silently
+            # every month at 6am.
+            return Response(
+                {"error": {"type": "recipient_not_allowed", "message": str(exc)}}, status=400
+            )
+
+        actor = request.acting_agent.pk
+        with transaction.atomic():
+            schedule = ReportSchedule.objects.create(
+                tenant=request.user.tenant,
+                name=name,
+                recipients=[r.address for r in resolved],
+                day_of_month=day,
+                hour=hour,
+                timezone_name=zone_name,
+                created_by=actor,
+                reason=reason,
+            )
+            audit.append(
+                tenant=request.user.tenant,
+                event_type="report.schedule_created",
+                subject_type="report_schedule",
+                subject_id=schedule.pk,
+                actor_type="user",
+                actor_id=actor,
+                payload={
+                    "name": name,
+                    "recipients": schedule.recipients,
+                    "day_of_month": day,
+                    "hour": hour,
+                    "timezone": zone_name,
+                    "reason": reason,
+                },
+            )
+
+        return Response(_schedule(schedule), status=201)
+
+
+class ReportScheduleDetailView(PeriodMixin, APIView):
+    permission_classes = [CanChangeCompliancePolicy]
+
+    def delete(self, request, schedule_id: str):
+        """Deactivates. The record that a firm was mailing its disputes out
+        monthly, and to whom, outlives the arrangement."""
+        schedule = ReportSchedule.objects.filter(pk=schedule_id).first()
+        if schedule is None:
+            raise NotFound
+
+        actor = request.acting_agent.pk
+        with transaction.atomic():
+            if schedule.is_active:
+                schedule.is_active = False
+                schedule.deactivated_by = actor
+                schedule.deactivated_at = timezone.now()
+                schedule.save(update_fields=["is_active", "deactivated_by", "deactivated_at"])
+                audit.append(
+                    tenant=request.user.tenant,
+                    event_type="report.schedule_deactivated",
+                    subject_type="report_schedule",
+                    subject_id=schedule.pk,
+                    actor_type="user",
+                    actor_id=actor,
+                    payload={"name": schedule.name, "recipients": schedule.recipients},
+                )
+        return Response(_schedule(schedule))
+
+
+def _schedule(schedule: ReportSchedule) -> dict:
+    from disputeshield.reports import schedules as scheduling
+
+    return {
+        "id": schedule.pk,
+        "name": schedule.name,
+        "recipients": schedule.recipients,
+        "day_of_month": schedule.day_of_month,
+        "hour": schedule.hour,
+        "timezone": schedule.timezone_name,
+        "is_active": schedule.is_active,
+        "reason": schedule.reason,
+        "created_by": schedule.created_by,
+        # The last month whose export was confirmed delivered. Null means none
+        # has been yet, which for a schedule created this month is correct and
+        # for one created a year ago is the thing to look at.
+        "last_period_delivered": (
+            schedule.last_period_start.isoformat() if schedule.last_period_start else None
+        ),
+        "next_period": scheduling.next_month(
+            schedule.last_period_start or scheduling.month_start(schedule.created_at.date())
+        ).isoformat(),
+        # Surfaced, not buried. A month that could not be delivered is the single
+        # most important thing this endpoint can tell a compliance officer.
+        "failed_periods": schedule.failed_periods,
+    }
 
 
 class RegulatoryReportEmailView(PeriodMixin, APIView):

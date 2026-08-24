@@ -75,7 +75,40 @@ A whole request is refused when *any* address is unknown, rather than sending to
 the recognised subset. A partial send is a supervisor waiting for a report that
 four of five people received, with nobody noticing for a week.
 
-## 5. Post-incident
+## 5. A monthly schedule has not delivered
+
+Start with what the schedule believes:
+
+```bash
+python manage.py disputeshield_run_report_schedules --dry-run
+```
+
+It prints, per schedule, the months it considers owed. A month is owed until a
+delivery for it is confirmed `sent`, so this is the real state rather than a
+next-run timestamp.
+
+- **Nothing owed, and the recipient has nothing** → the delivery went out; go to
+  §3. `last_period_delivered` on `GET /v1/reports/schedules` says which month was
+  the last confirmed one.
+- **Months owed going back further than a day** → nothing is running the runner.
+  `disputeshield_doctor` reports this as `report schedules`. Check that the
+  `disputeshield.reports.run_schedules` beat task is scheduled; a deployment with
+  the worker but no beat leaves schedules looking perfectly healthy.
+- **One month owed and stuck** → look for its delivery rows. The schedule opens a
+  new attempt per failure, up to three, then records the month in
+  `failed_periods` and steps over it. Each attempt's `last_error` says why; §1
+  and §2 above cover the two causes.
+- **`report.schedule_blocked` in the audit trail** → every recipient on the
+  schedule was deactivated, or the export exceeded the attachment limit. The
+  month stays owed, so fixing the recipients and waiting for the next hourly run
+  is enough — no replay needed.
+
+A month in `failed_periods` is **not** retried automatically. That is deliberate:
+three failed attempts means something about the period needs a person. Deliver it
+by hand with `POST /v1/reports/regulatory/email` for that period once the cause is
+fixed.
+
+## 6. Post-incident
 
 - Was the refusal correct? A refusal that turns out to have been right needs no
   fix — resist adding a "force send" flag, which converts every future instance
@@ -85,6 +118,10 @@ four of five people received, with nobody noticing for a week.
   worth saying to the requester rather than engineering around.
 - Anything an installation could get wrong at deploy time belongs in
   `disputeshield_doctor`.
+- If a schedule abandoned a month, ask why the period was still moving three
+  attempts later. A period with long-open cases is not a good fit for an early
+  `day_of_month`; moving the schedule later in the month is usually the fix, and
+  is better than raising the attempt limit.
 
 ---
 

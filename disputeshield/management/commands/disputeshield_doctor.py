@@ -47,6 +47,7 @@ class Command(BaseCommand):
             self._check_clock_skew(),
             self._check_sweep_heartbeat(),
             self._check_report_delivery(),
+            self._check_report_schedules(),
         ]
 
         for check in checks:
@@ -189,6 +190,46 @@ class Command(BaseCommand):
             False,
             f"{registered} recipient(s) registered but EMAIL_BACKEND is the {kind} backend. "
             "A report would be marked delivered and audited as such without leaving the machine.",
+        )
+
+    def _check_report_schedules(self) -> Check:
+        """An active monthly schedule that nothing is running.
+
+        The task is registered in Celery beat, and a deployment that runs the
+        worker without the beat is a configuration a monthly report can hide in
+        for a long time: the schedule exists, it looks active, and the first
+        person to notice is a supervisor asking where the return is. A period
+        overdue by more than a grace window means nothing is calling the runner.
+        """
+        from django.utils import timezone
+
+        from disputeshield.models import ReportSchedule
+        from disputeshield.reports import schedules
+        from disputeshield.tenancy.platform import for_each_tenant
+
+        # Two days. The runner is hourly, so anything beyond a day means it is
+        # not running at all rather than merely behind.
+        grace = timezone.timedelta(days=2)
+        cutoff = timezone.now() - grace
+
+        def overdue_for_tenant(_tenant_id):
+            return [
+                (schedule.pk, owed[0].isoformat())
+                for schedule in ReportSchedule.objects.filter(is_active=True)
+                if (owed := schedules.periods_owed(schedule, now=cutoff))
+            ]
+
+        overdue = [row for rows in for_each_tenant(overdue_for_tenant) for row in rows]
+        if not overdue:
+            return Check("report schedules", True, "none overdue")
+
+        first = ", ".join(f"{pk} owes {period}" for pk, period in overdue[:3])
+        return Check(
+            "report schedules",
+            False,
+            f"{len(overdue)} active schedule(s) overdue by more than {grace.days} days "
+            f"({first}). Is the `disputeshield.reports.run_schedules` beat task running?",
+            fatal=False,
         )
 
     def _check_clock_skew(self) -> Check:

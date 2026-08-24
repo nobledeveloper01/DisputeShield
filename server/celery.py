@@ -52,6 +52,16 @@ app.conf.beat_schedule = {
         "task": "disputeshield.audit.anchor",
         "schedule": crontab(minute="*/15"),
     },
+    "disputeshield-report-schedules": {
+        # Hourly, not monthly. A schedule fires on a day and hour in its own
+        # timezone, so the job has to look often enough to catch every zone's
+        # 6am — and because a month is owed until it is delivered, an hourly
+        # runner also retries a period that failed and catches up months missed
+        # while the scheduler was down. A monthly cron would get one attempt a
+        # year at each of those.
+        "task": "disputeshield.reports.run_schedules",
+        "schedule": crontab(minute=5),
+    },
     "disputeshield-deadline-reconcile": {
         # ADR-0007: materialised deadlines must not drift from what
         # compute_deadline would produce. Nothing recomputes them implicitly, so

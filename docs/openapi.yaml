@@ -1036,6 +1036,93 @@ paths:
         '200':
           description: The deactivated recipient.
         '404': *id002
+  /v1/reports/schedules:
+    get:
+      summary: Monthly export schedules
+      operationId: listReportSchedules
+      security:
+      - agentKey: []
+      description: 'Compliance role only. `last_period_delivered` is the last calendar month whose
+        export was *confirmed delivered* — not the last time the job ran. A schedule that queues twelve
+        exports a year and delivers none cannot look healthy here. `failed_periods` lists months that
+        could not be delivered after the maximum attempts and were stepped over; stepping over is
+        deliberate, because blocking every future month behind one stuck month turns a single bad
+        period into a total, silent outage.'
+      responses:
+        '200':
+          description: Every schedule, active first.
+        '404': *id002
+    post:
+      summary: Create a monthly export schedule
+      operationId: createReportSchedule
+      security:
+      - agentKey: []
+      description: 'Compliance role only. A schedule is a standing instruction that a period leaves
+        this system every month, so creating one is the same decision as sending one — made once, for
+        every future month. Recipients must already be on the allowlist: a schedule that cannot deliver
+        should fail while somebody is looking at it, not silently every month at 6am. Each run exports a
+        **closed** calendar month in the schedule''s own timezone; the current month is never exported,
+        because a period still accepting cases produces a different document every time it is built.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, recipients, reason]
+              properties:
+                name:
+                  type: string
+                recipients:
+                  type: array
+                  items:
+                    type: string
+                    format: email
+                  description: Each must already be an active entry on the allowlist.
+                day_of_month:
+                  type: integer
+                  minimum: 1
+                  maximum: 28
+                  default: 5
+                  description: 'Of the month *after* the period. Capped at 28: days 29 to 31 do not
+                    exist in every month, and sliding silently to the last day would make a reporting
+                    deadline mean a different date in February.'
+                hour:
+                  type: integer
+                  minimum: 0
+                  maximum: 23
+                  default: 6
+                timezone:
+                  type: string
+                  default: UTC
+                  description: An IANA name. A firm's March does not start when UTC's does.
+                reason:
+                  type: string
+      responses:
+        '201':
+          description: The schedule. Its first period is the month it was created in.
+        '400':
+          description: A missing field, a day outside 1-28, an unknown timezone, or a recipient that
+            is not on the allowlist.
+        '404': *id002
+  /v1/reports/schedules/{schedule_id}:
+    delete:
+      summary: Deactivate a schedule
+      operationId: deactivateReportSchedule
+      security:
+      - agentKey: []
+      description: Deactivates rather than deletes. The record that a firm was mailing its disputes out
+        monthly, and to whom, outlives the arrangement.
+      parameters:
+      - name: schedule_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The deactivated schedule.
+        '404': *id002
   /v1/audit/verify:
     get:
       summary: Verify the audit chain

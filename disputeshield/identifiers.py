@@ -209,3 +209,7 @@ def generate_api_key(environment: str, kind: str = "secret") -> tuple[str, str]:
 
 def report_recipient_id() -> str:
     return new_id("rcp")
+
+
+def report_schedule_id() -> str:
+    return new_id("sch")

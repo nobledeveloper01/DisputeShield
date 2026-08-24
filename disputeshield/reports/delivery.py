@@ -118,6 +118,7 @@ def request_delivery(
     addresses: list[str],
     requested_by: str,
     note: str = "",
+    attempt: int = 0,
 ) -> Queued:
     """Queue one export for delivery. Builds it once, to fail now rather than later."""
     from disputeshield import audit
@@ -137,7 +138,7 @@ def request_delivery(
         )
 
     files = dict(export.manifest["files"])
-    key = _idempotency_key(period_from, period_to, [r.address for r in recipients])
+    key = idempotency_key(period_from, period_to, [r.address for r in recipients], attempt=attempt)
 
     with transaction.atomic():
         notification, created = NotificationOutbox.objects.get_or_create(
@@ -289,12 +290,26 @@ def _body(payload: dict, period_from: datetime, period_to: datetime, attachment:
     )
 
 
-def _idempotency_key(period_from: datetime, period_to: datetime, addresses: list[str]) -> str:
+def idempotency_key(
+    period_from: datetime, period_to: datetime, addresses: list[str], *, attempt: int = 0
+) -> str:
     """Derived from what the delivery is *about*, like every other outbox key.
 
     The consequence is deliberate: asking twice for the same period to the same
     people sends one email, so a retried request during an incident cannot page a
     regulator's inbox twice.
+
+    `attempt` exists for the scheduler and defaults to 0, which is every request a
+    person makes. When a delivery is parked because the period moved between the
+    request and the send, the promise it was carrying is spent — it can never be
+    satisfied, because the bundle it described no longer exists. A schedule opens
+    a *new* delivery with a fresh promise rather than editing the old one's, so
+    the trail reads "attempt 0 refused because the period changed, attempt 1
+    delivered" instead of a single row whose recorded promise quietly became
+    something else.
     """
-    material = f"{period_from.isoformat()}|{period_to.isoformat()}|{','.join(sorted(addresses))}"
+    material = (
+        f"{period_from.isoformat()}|{period_to.isoformat()}|{','.join(sorted(addresses))}"
+        f"{'|' + str(attempt) if attempt else ''}"
+    )
     return f"{EVENT_TYPE}:{hashlib.sha256(material.encode()).hexdigest()[:32]}"

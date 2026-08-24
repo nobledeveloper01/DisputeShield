@@ -11,6 +11,49 @@ and released from one tag.
 
 ### Added
 
+- **Scheduled monthly delivery** — `POST /v1/reports/schedules`, compliance-only,
+  with an hourly runner (`disputeshield.reports.run_schedules`) and
+  `disputeshield_run_report_schedules` for catching up by hand.
+- **The runner asks what is owed, not what is due now.** A month stops being owed
+  only when a delivery for it is confirmed `sent` — not when one is queued. Three
+  properties fall out of that single decision: catch-up is free (a runner down for
+  two months finds two months owed, because nothing recorded them as done), a
+  schedule that queues twelve exports a year and delivers none cannot look
+  healthy, and firing the runner twice cannot mail a period twice.
+- **A closed month, in the schedule's own timezone.** The current month is never
+  exported: a period still accepting cases produces a different document every
+  time it is built, which would make the delivery's digest check refuse and the
+  artefact worthless as a record. A firm's March does not start when UTC's does,
+  so the month boundary is the schedule's, as a half-open interval — a closed one
+  either double-counts the boundary instant or drops it, and for a monthly return
+  that is a case reported twice or not at all.
+- **`day_of_month` is capped at 28.** Days 29 to 31 do not exist in every month,
+  and the usual workaround — sliding silently to the last day — makes a reporting
+  deadline mean a different date in February. Refusing is clearer than guessing.
+- Missed months go out **one at a time, in order**. Queueing two at once would
+  deliver them out of order, and the second would read as a correction of the
+  first.
+- A month that cannot be delivered after three attempts is **recorded in
+  `failed_periods`, audited, and stepped over**. Stepping over is deliberate —
+  blocking every future month behind one stuck month turns a single bad period
+  into a total, silent outage — and recording it is what keeps that from being a
+  quiet skip. The API surfaces `failed_periods` rather than burying it.
+- Deactivating every recipient **blocks rather than skips**: the month stays owed,
+  a `report.schedule_blocked` audit record says why, and the runner logs an error.
+  A schedule that looks active and delivers nothing is the failure this whole
+  feature exists to prevent.
+- `idempotency_key` gained an `attempt`, defaulting to 0 for every request a
+  person makes. When a delivery parks because the period moved between request
+  and send, the promise it carried is spent — it can never be satisfied, because
+  the bundle it described no longer exists. The scheduler opens a *new* delivery
+  with a fresh promise rather than editing the old one's, so the trail reads
+  "attempt 0 refused because the period changed, attempt 1 delivered" instead of
+  one row whose recorded promise quietly became something else.
+- `disputeshield_doctor` gained a `report schedules` check: an active schedule
+  overdue by more than two days means nothing is calling the runner. A deployment
+  with the worker but no beat is a configuration a monthly report can hide in for
+  a long time, and the first person to notice is a supervisor asking where the
+  return is.
 - **Email delivery of the regulatory export** — `POST /v1/reports/regulatory/email`,
   compliance-only. Producing a supervisory return by hand from a download was the
   manual step §6.5 exists to remove.

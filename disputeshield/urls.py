@@ -19,6 +19,8 @@ from disputeshield.api.views_reports import (
     RegulatoryReportView,
     ReportRecipientDetailView,
     ReportRecipientView,
+    ReportScheduleDetailView,
+    ReportScheduleView,
     SLAPerformanceView,
 )
 from disputeshield.api.views_widget import (
@@ -63,6 +65,12 @@ urlpatterns = [
         "v1/reports/recipients/<str:recipient_id>",
         ReportRecipientDetailView.as_view(),
         name="report-recipient-detail",
+    ),
+    path("v1/reports/schedules", ReportScheduleView.as_view(), name="report-schedules"),
+    path(
+        "v1/reports/schedules/<str:schedule_id>",
+        ReportScheduleDetailView.as_view(),
+        name="report-schedule-detail",
     ),
     path("v1/audit/verify", AuditVerifyView.as_view(), name="audit-verify"),
     path("v1/", include(router.urls)),
