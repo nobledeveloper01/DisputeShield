@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import Analysis from './analysis/Analysis.jsx';
 import Case from './case/Case.jsx';
+import Policies from './policies/Policies.jsx';
 import Queue from './queue/Queue.jsx';
 import Recipients from './reports/Recipients.jsx';
 import Schedules from './reports/Schedules.jsx';
@@ -26,6 +27,13 @@ export default function App({ client }) {
         </a>
         <a
           className="ds-link"
+          href="#/policies"
+          aria-current={route.name === 'policies' ? 'page' : undefined}
+        >
+          SLA policies
+        </a>
+        <a
+          className="ds-link"
           href="#/analysis"
           aria-current={route.name === 'analysis' ? 'page' : undefined}
         >
@@ -42,6 +50,7 @@ export default function App({ client }) {
 
       {route.name === 'queue' ? <QueueScreen client={client} /> : null}
       {route.name === 'case' ? <CaseScreen client={client} id={route.id} /> : null}
+      {route.name === 'policies' ? <PoliciesScreen client={client} /> : null}
       {route.name === 'analysis' ? <AnalysisScreen client={client} /> : null}
       {route.name === 'reports' ? <ReportsScreen client={client} /> : null}
     </>
@@ -163,6 +172,61 @@ function Failed({ message }) {
  * partially-rendered list of schedules invites a decision made on half the
  * picture.
  */
+function PoliciesScreen({ client }) {
+  const [list, setList] = useState(null);
+  const [calendars, setCalendars] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const page = await client.listPolicies();
+      setList(page.data);
+      setCalendars(page.calendars || []);
+      const id = selected || page.data[0]?.id || null;
+      setSelected(id);
+      // The list gives current terms; the detail adds the change history, which
+      // is what makes this screen worth opening.
+      setDetail(id ? await client.getPolicy(id) : null);
+      setError('');
+    } catch (problem) {
+      setError(problem.message);
+    }
+  }, [client, selected]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (error) return <Failed message={error} />;
+  if (list === null) return <Loading />;
+
+  const merged = list.map((entry) => (entry.id === detail?.id ? detail : entry));
+
+  return (
+    <main className="ds-app ds-app-wide">
+      <Policies
+        policies={merged}
+        calendars={calendars}
+        selected={selected}
+        busy={busy}
+        onSelect={setSelected}
+        onPublish={async (id, terms) => {
+          setBusy(true);
+          try {
+            await client.publishPolicy(id, terms);
+            await load();
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+    </main>
+  );
+}
+
 function AnalysisScreen({ client }) {
   const [data, setData] = useState(null);
   const [groupBy, setGroupBy] = useState('category');

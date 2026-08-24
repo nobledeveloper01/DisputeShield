@@ -271,6 +271,59 @@ export const ANALYSIS_MIXED = {
   summary: { ...ANALYSIS.summary, currencies: ['NGN', 'USD'] }
 };
 
+const V1 = {
+  id: 'ver_1',
+  version: 1,
+  calendar: 'Lagos business hours',
+  calendar_timezone: 'Africa/Lagos',
+  created_at: '2026-01-04T09:00:00+00:00',
+  created_by: 'agt_adaeze',
+  acknowledgement_minutes: 60,
+  resolution_hours: 72,
+  business_hours_only: true,
+  warning_thresholds: [50, 80, 95],
+  escalate_at_percent: 80,
+  auto_close_after_hours: 168,
+  reopen_window_hours: 336,
+  regulatory_reference: 'CBN 2020 §3.1'
+};
+const V2 = { ...V1, id: 'ver_2', version: 2, resolution_hours: 168, created_at: '2026-04-02T11:30:00+00:00' };
+
+export const POLICIES = {
+  data: [
+    {
+      id: 'pol_transfer',
+      category: 'failed_transfer',
+      description: '',
+      current: V2,
+      version_count: 2
+    },
+    {
+      id: 'pol_airtime',
+      category: 'failed_airtime',
+      description: '',
+      current: { ...V1, id: 'ver_3' },
+      version_count: 1
+    }
+  ],
+  calendars: [{ id: 'cal_1', name: 'Lagos business hours', timezone: 'Africa/Lagos' }]
+};
+
+export const POLICY_DETAIL = {
+  ...POLICIES.data[0],
+  history: [
+    { ...V2, changed: { resolution_hours: [72, 168] } },
+    { ...V1, changed: {} }
+  ]
+};
+
+export async function stubPolicies(page) {
+  await page.route('**/v1/sla-policies', (route) => route.fulfill({ json: POLICIES }));
+  await page.route('**/v1/sla-policies/*', (route) =>
+    route.fulfill({ json: POLICY_DETAIL })
+  );
+}
+
 export async function stubAnalysis(page, payload = ANALYSIS) {
   await page.route('**/v1/analytics/sla-performance*', (route) => route.fulfill({ json: payload }));
 }

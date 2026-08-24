@@ -68,9 +68,12 @@ export default function Analysis({ data, period, groupBy, onPeriod, onGroupBy })
             {/* Inside the <dd>, not beside it: a <div> inside a <dl> may only
                 contain <dt> and <dd>, and a stray <p> makes the whole list
                 unparseable to a screen reader. */}
+            {/* Beside the count above rather than in its own panel: a fall in
+                recorded complaints during an outage has to be visibly a
+                deflection rather than silently a suppression. */}
             <span className="ds-help">
-              Shown next to the count above on purpose. A fall in recorded complaints during an
-              outage has to be visibly a deflection rather than silently a suppression.
+              Customers who were shown a known incident and did not file. Read this against the
+              count beside it: a fall in complaints during an outage should be explained here.
             </span>
           </dd>
         </div>

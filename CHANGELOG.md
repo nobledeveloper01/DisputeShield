@@ -11,6 +11,37 @@ and released from one tag.
 
 ### Added
 
+- **SLA policies: the management API and the view** —
+  `GET/POST /v1/sla-policies`, `GET/PATCH /v1/sla-policies/{id}`, and
+  `dashboard/src/policies/`. §7.3 documented the endpoints; nothing implemented
+  them.
+- **§7.3 says PATCH, ADR-0004 says the terms are immutable, and the two are
+  reconciled rather than chosen between.** A PATCH is accepted, and its effect is
+  to publish version n+1. The policy resource changes; the terms any case was
+  judged under are untouched. A PATCH that mutated in place would satisfy the
+  endpoint documentation and destroy the evidence a supervisor asks for.
+- A sparse PATCH **carries forward what it did not mention**. Sending the body
+  straight through would publish a version whose unmentioned terms had silently
+  become defaults — a policy quietly rewritten by a request that named one field.
+- Publishing terms identical to the current version **adds no version**. A no-op
+  version is a row a reviewer has to read and discard, and enough of them make
+  the change history useless for the one thing it exists for.
+- The audit record carries **what changed**, as `{field: [before, after]}`, not
+  the new snapshot. "The resolution window went from 72 to 168 hours on the 4th"
+  is the sentence a supervisor needs, and it is not recoverable from two full
+  snapshots without someone comparing them by eye.
+- Terms that cannot describe a real window are **refused with the reason**: a
+  zero-hour resolution window breaches every case the moment it is filed, a
+  warning threshold at or above 100 never fires (and a policy that looks
+  configured but warns nobody is worse than one with no warnings), and escalation
+  at 100% escalates a case that has already breached.
+- **The view is built around nothing being edited.** The button says "Publish
+  version 3" rather than "Save", the change history sits beside the terms rather
+  than behind a tab, and the form states that filed cases keep their version. An
+  officer who leaves believing they edited a setting has the wrong model of the
+  system in exactly the situation that matters.
+- The business calendar is read-only from inside a policy: it is shared by
+  several, and editing it from within one hides the change from the others.
 - **The breach analysis view** (`dashboard/src/analysis/`), the screen a
   compliance officer answers a supervisor from.
 - **Deflections render beside case volume**, never in their own panel. A feature
@@ -231,6 +262,11 @@ and released from one tag.
 
 ### Fixed
 
+- Developer commentary had leaked into two screens as user-facing help text —
+  copy explaining *why a panel was placed where it is* tells a compliance officer
+  nothing. The reasoning moved into comments and the help text now says what the
+  figures mean. One string also read "on save" on a screen whose button
+  deliberately never says Save.
 - **A refund total could be quoted across two currencies.** `summary()` sums
   `refund_amount_minor` with nothing checking the values are the same unit, so a
   period holding both NGN and USD cases produced a figure that adds kobo to

@@ -404,3 +404,35 @@ span.ds-help { display: block; }
 .ds-causes { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--ds-line); border: 1px solid var(--ds-line); }
 .ds-causes li { background: var(--ds-bg); padding: var(--ds-space) calc(var(--ds-space) * 1.5); display: flex; gap: calc(var(--ds-space) * 2); }
 .ds-causes-count { min-width: 3ch; text-align: right; font-weight: 600; }
+
+/* --- SLA policies --------------------------------------------------------- */
+
+.ds-policies { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: calc(var(--ds-space) * 4); align-items: start; }
+.ds-policy-list ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--ds-line); border: 1px solid var(--ds-line); }
+.ds-policy-tab {
+  width: 100%; text-align: left; font: inherit; cursor: pointer;
+  background: var(--ds-bg); border: 0; padding: var(--ds-space) calc(var(--ds-space) * 1.5);
+  display: grid; gap: 2px;
+}
+.ds-policy-tab:hover { background: var(--ds-raised); }
+/* Current is ink and weight, never colour. */
+.ds-policy-tab-current { background: var(--ds-raised); box-shadow: inset 3px 0 0 var(--ds-ink); }
+.ds-policy-name { font-weight: 600; }
+
+.ds-policy-detail { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: calc(var(--ds-space) * 4); align-items: start; }
+.ds-policy-form { max-width: none; margin-top: 0; padding-top: 0; border-top: 0; }
+.ds-policy-form .ds-h2 { margin-top: 0; }
+.ds-row-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ds-note-inline { color: var(--ds-muted); font-weight: 400; font-size: 12px; }
+
+.ds-problems { margin: 0; padding: var(--ds-space) var(--ds-space) var(--ds-space) calc(var(--ds-space) * 3); border-left: 4px solid var(--ds-breached); background: var(--ds-raised); }
+.ds-problems li + li { margin-top: 4px; }
+
+.ds-history { position: sticky; top: var(--ds-space); }
+.ds-changes { list-style: none; margin: 4px 0 0; padding: 0; }
+.ds-change-field { color: var(--ds-muted); font-size: 13px; }
+
+@media (max-width: 1100px) {
+  .ds-policies, .ds-policy-detail { grid-template-columns: minmax(0, 1fr); }
+  .ds-history { position: static; }
+}

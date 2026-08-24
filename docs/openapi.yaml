@@ -242,6 +242,47 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/WidgetMessage'
+    SlaPolicyTerms:
+      type: object
+      properties:
+        category:
+          type: string
+          description: Required when creating; ignored on PATCH.
+        acknowledgement_minutes:
+          type: integer
+          minimum: 1
+        resolution_hours:
+          type: integer
+          minimum: 1
+          description: A window under an hour breaches every case the moment it is filed.
+        business_hours_only:
+          type: boolean
+        warning_thresholds:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 99
+          description: Percentages of the window. A threshold at or above 100 never fires, so it is
+            refused rather than accepted and silently ignored.
+        escalate_at_percent:
+          type: integer
+          minimum: 1
+          maximum: 99
+          description: Below 100, because escalating at 100% escalates a case that has already
+            breached, which is a notification rather than an escalation.
+        auto_close_after_hours:
+          type: integer
+          minimum: 1
+        reopen_window_hours:
+          type: integer
+          minimum: 1
+        regulatory_reference:
+          type: string
+          description: What these windows are derived from. Turns a configuration value into
+            documented evidence of intent.
+        calendar_id:
+          type: string
     WidgetMessage:
       type: object
       properties:
@@ -1130,6 +1171,84 @@ paths:
       responses:
         '200':
           description: The deactivated schedule.
+        '404': *id002
+  /v1/sla-policies:
+    get:
+      summary: SLA policies and their current terms
+      operationId: listSlaPolicies
+      security:
+      - agentKey: []
+      description: Readable by any role that can read. Also returns the tenant's business calendars,
+        because a policy's terms are meaningless without the hours they are counted in.
+      responses:
+        '200':
+          description: Every policy with its current version, plus the available calendars.
+        '404': *id002
+    post:
+      summary: Create a policy for a category
+      operationId: createSlaPolicy
+      security:
+      - agentKey: []
+      description: 'Compliance role only. Publishes version 1 of the category''s terms.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlaPolicyTerms'
+      responses:
+        '201':
+          description: The policy, with version 1 in force.
+        '400':
+          description: Terms that cannot describe a real window. The message says which and why.
+        '404': *id002
+  /v1/sla-policies/{policy_id}:
+    get:
+      summary: One policy, with its full change history
+      operationId: getSlaPolicy
+      security:
+      - agentKey: []
+      description: '`history` is newest-first and each entry carries `changed` as
+        `{field: [before, after]}` — the shape a supervisor''s question takes ("the resolution
+        window went from 72 to 168 hours on the 4th"), which two full snapshots do not contain.'
+      parameters:
+      - name: policy_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The policy, its current terms and every version.
+        '404': *id002
+    patch:
+      summary: Change a policy's terms
+      operationId: updateSlaPolicy
+      security:
+      - agentKey: []
+      description: 'Compliance role only. **Publishes version n+1 rather than editing in place.**
+        The terms of a policy are immutable (ADR-0004) and a dispute pins the version in force when
+        it was filed, so the standard a case was judged against stays recoverable years later. A
+        PATCH that mutated the terms would satisfy this endpoint''s documentation and destroy that
+        evidence. Fields omitted from the body are carried forward from the version in force —
+        a sparse body must not publish a version whose unmentioned terms silently became defaults.
+        Publishing terms identical to the current version is a no-op and adds no version.'
+      parameters:
+      - name: policy_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlaPolicyTerms'
+      responses:
+        '200':
+          description: The policy with its new version, and `changed` describing what moved.
+        '400':
+          description: Terms that cannot describe a real window.
         '404': *id002
   /v1/audit/verify:
     get:

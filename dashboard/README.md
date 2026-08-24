@@ -16,9 +16,9 @@ Roles are Owner, Compliance, Agent and Read-only. An agent can resolve a case bu
 cannot change an SLA policy; a compliance user can change a policy, and the change
 is recorded, versioned and rendered next to the breach data it affects.
 
-**Built so far:** the queue (`src/queue/`), the case view (`src/case/`), breach
-analysis (`src/analysis/`) and report delivery (`src/reports/`). SLA policies,
-widget config and settings are still to come.
+**Built so far:** the queue (`src/queue/`), the case view (`src/case/`), SLA
+policies (`src/policies/`), breach analysis (`src/analysis/`) and report delivery
+(`src/reports/`). Widget config and settings are still to come.
 
 ## Running it
 
@@ -54,6 +54,24 @@ the other — and in the dangerous direction, because an agent triages from the
 queue. So the clock is time-until-deadline everywhere, and the case additionally
 shows business time under its own explicit label. Two figures with two labels is
 honest; one label over two quantities is not.
+
+## SLA policies
+
+The screen is built around the fact that nothing on it is edited. Terms are
+immutable and versioned (ADR-0004): a change publishes version n+1, and every
+case keeps the version it was filed under. So the button says **"Publish version
+3"** rather than "Save", the change history sits beside the terms rather than
+behind a tab, and the form states that filed cases keep their version.
+
+That is not decoration. An officer who leaves believing they edited a setting has
+the wrong model of the system in the one situation that matters — a supervisor
+asking which standard a case was judged against.
+
+`§7.3` documents `PATCH /v1/sla-policies/{id}` while the architecture says the
+terms are immutable. The two are reconciled in `disputeshield/sla/policies.py`
+rather than by picking one: a PATCH is accepted and its effect is to publish a
+new version. A sparse body carries forward what it did not mention, so a PATCH of
+one field cannot publish a version whose other terms silently became defaults.
 
 ## Breach analysis
 

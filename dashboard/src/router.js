@@ -13,6 +13,7 @@ export function parse(hash) {
   if (caseMatch) return { name: 'case', id: caseMatch[1] };
   if (path === '/reports') return { name: 'reports' };
   if (path === '/analysis') return { name: 'analysis' };
+  if (path === '/policies') return { name: 'policies' };
   return { name: 'queue' };
 }
 

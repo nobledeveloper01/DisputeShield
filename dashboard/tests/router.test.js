@@ -22,6 +22,7 @@ test('an identifier outside the API’s own character set does not route', () =>
 test('the compliance routes resolve', () => {
   assert.deepEqual(parse('#/reports'), { name: 'reports' });
   assert.deepEqual(parse('#/analysis'), { name: 'analysis' });
+  assert.deepEqual(parse('#/policies'), { name: 'policies' });
 });
 
 test('an unknown route falls back to the queue rather than blank', () => {

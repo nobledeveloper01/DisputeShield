@@ -13,6 +13,7 @@ from disputeshield.api.views_embed import EmbedView
 from disputeshield.api.views_health import healthz, readyz
 from disputeshield.api.views_intake import IntakeView, WidgetDeflectionView
 from disputeshield.api.views_management import DisputeViewSet
+from disputeshield.api.views_policies import SLAPolicyDetailView, SLAPolicyView
 from disputeshield.api.views_reports import (
     AuditVerifyView,
     RegulatoryReportEmailView,
@@ -71,6 +72,12 @@ urlpatterns = [
         "v1/reports/schedules/<str:schedule_id>",
         ReportScheduleDetailView.as_view(),
         name="report-schedule-detail",
+    ),
+    path("v1/sla-policies", SLAPolicyView.as_view(), name="sla-policies"),
+    path(
+        "v1/sla-policies/<str:policy_id>",
+        SLAPolicyDetailView.as_view(),
+        name="sla-policy-detail",
     ),
     path("v1/audit/verify", AuditVerifyView.as_view(), name="audit-verify"),
     path("v1/", include(router.urls)),

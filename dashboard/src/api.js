@@ -45,6 +45,11 @@ export function createClient({ baseUrl }) {
     resume: (id, reason) =>
       request(`/v1/disputes/${id}/resume/`, { method: 'POST', body: { reason } }),
 
+    listPolicies: () => request('/v1/sla-policies'),
+    getPolicy: (id) => request(`/v1/sla-policies/${id}`),
+    publishPolicy: (id, terms) =>
+      request(`/v1/sla-policies/${id}`, { method: 'PATCH', body: terms }),
+
     slaPerformance: ({ from, to, group_by }) => {
       const query = new URLSearchParams(
         Object.entries({ from, to, group_by }).filter(([, v]) => v)
