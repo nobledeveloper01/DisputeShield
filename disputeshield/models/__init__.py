@@ -15,6 +15,11 @@ from disputeshield.models.clock import (
     SLAEvent,
     SweepHeartbeat,
 )
+from disputeshield.models.connectors import (
+    ProviderCall,
+    ProviderConnector,
+    SettlementConfirmation,
+)
 from disputeshield.models.dispute import (
     Dispute,
     DisputeMessage,
@@ -40,6 +45,7 @@ from disputeshield.models.intake import (
 )
 from disputeshield.models.policy import SLAPolicy, SLAPolicyVersion
 from disputeshield.models.returns import RegulatoryReturn, ReturnTemplate
+from disputeshield.models.scheme import ReasonCode, Representment
 from disputeshield.models.tenant import Tenant
 from disputeshield.models.widget import AllowedOrigin, WidgetConfig, validate_origin
 
@@ -71,7 +77,11 @@ __all__ = [
     "MassEventMembership",
     "NotificationOutbox",
     "Outcome",
+    "ProviderCall",
+    "ProviderConnector",
+    "ReasonCode",
     "RegulatoryReturn",
+    "Representment",
     "ResponseTemplate",
     "ReturnTemplate",
     "SLAClock",
@@ -79,6 +89,7 @@ __all__ = [
     "SLAEvent",
     "SLAPolicy",
     "SLAPolicyVersion",
+    "SettlementConfirmation",
     "Status",
     "SweepHeartbeat",
     "Tenant",

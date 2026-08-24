@@ -122,6 +122,10 @@ class SLADeadline(TenantScopedModel):
         WARNING = "warning", "Warning threshold"
         AUTO_CLOSE = "auto_close", "Auto-close due"
         REOPEN_WINDOW = "reopen_window", "Reopen window expires"
+        # The card scheme's own window (amplifier A5). A different regime with
+        # different rules, running concurrently with ours.
+        SCHEME_REPRESENTMENT = "scheme_representment", "Scheme representment due"
+        SCHEME_WARNING = "scheme_warning", "Scheme warning threshold"
 
     id = models.CharField(primary_key=True, max_length=32, default=deadline_id, editable=False)
     clock = models.ForeignKey(SLAClock, on_delete=models.PROTECT, related_name="deadlines")
@@ -130,6 +134,16 @@ class SLADeadline(TenantScopedModel):
 
     fires_at = models.DateTimeField()
     fired_at = models.DateTimeField(null=True, blank=True)
+
+    # Whether pausing the case moves this deadline.
+    #
+    # A card scheme does not care that the firm is waiting on the customer, and
+    # it does not observe the firm's business hours. So a scheme deadline is
+    # computed on wall-clock time and is never recomputed when the regulatory
+    # clock pauses — the two windows run concurrently and one can expire while
+    # the other is comfortable, which is exactly the case §11.4 has to alert on
+    # separately.
+    pausable = models.BooleanField(default=True)
 
     class Meta:
         db_table = "disputeshield_sladeadline"

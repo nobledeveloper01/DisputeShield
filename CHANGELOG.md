@@ -9,6 +9,59 @@ and released from one tag.
 
 ## [Unreleased]
 
+### Added — phase 9, the money side (v1.3)
+
+Amplifiers **A5** representment packs, **A4** provider connectors, **A16**
+financial exposure.
+
+- **Two clocks, structurally independent.** The scheme's representment window is
+  wall-clock, computed from the chargeback date, and marked `pausable=False` — so
+  pausing the regulatory clock never moves it. A card scheme does not care that
+  the firm is waiting on the customer, and it does not observe the firm's
+  business hours. They breach and alert separately, asserted with a case where
+  one is comfortable and the other is not.
+- Reason codes as **data**, with a per-code evidence checklist. Schemes revise
+  their requirements on their own schedule, and a mapping compiled into the
+  application goes stale between releases — at which point a representment is
+  refused for a missing element nobody knew had been added.
+- A pack refuses to export while the checklist is unsatisfied. The expensive
+  failure is an acquirer rejecting it *after* the window has closed.
+- **DisputeShield builds and exports the pack; it does not submit it.**
+  `submitted_by_disputeshield: false` is written into the audit record, not just
+  the documentation, and the field that records a submission is named for the
+  fintech that made it.
+- Provider connectors: read-only by construction, opt-in per tenant,
+  credentials envelope-encrypted with a per-tenant key. Every outbound call is
+  recorded with the exact request made — a customer's security team asking "what
+  did you ask our provider about me?" gets an answer from the record. A provider
+  outage degrades the case to "context unavailable" and never blocks filing.
+- `disputeshield/finance/` — value under dispute by category, age bands, expected
+  loss from the tenant's **own measured uphold rate** (absent rather than guessed
+  when there is no history), and reconciliation against settlement confirmations.
+  The unreconciled delta is reported and signed: more paid than promised is its
+  own finding, and netting it away would hide it.
+
+### Gates added — both permanent
+
+- **The connector interface exposes no write method.** Asserted by introspecting
+  the abstract base class and every subclass, against a list of write-shaped
+  verbs — so a connector written next year is covered the day it is written.
+- **No code path from any module to money movement.** Walked from the AST: the
+  finance package imports nothing that leaves the process, reaches no connector,
+  and makes no money-shaped call; and no function anywhere in the package is
+  named for moving money. §3.3 puts this under a permanent *Won't*, and the
+  credibility of an evidence system depends on it having no ability to act on the
+  thing it holds evidence about.
+
+### Fixed — during phase 9
+
+- **`_settle` in the intake router was renamed `_record_disposition`.** It meant
+  "record what we decided about this message", and in a payments product that
+  word means something else entirely. The money-movement gate flagged it, which
+  is the gate doing its job on a naming problem rather than a behavioural one.
+
+### Tests — 455 fast, 9 wall-clock gates, 91% coverage
+
 ### Added — phase 8, evidence that survives a lawyer (v1.2)
 
 Amplifiers **A7** legal hold, **A8** chain anchoring, **A6** external escalation,

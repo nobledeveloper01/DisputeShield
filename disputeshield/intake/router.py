@@ -68,10 +68,12 @@ def receive(*, tenant, channel: str, payload: dict, default_category: str = "oth
         if inbound.is_auto_reply:
             # Treating an out-of-office as a customer's response would resume a
             # paused clock on the strength of a mail server's holiday message.
-            return _settle(record, InboundMessage.State.IGNORED, "auto-reply or bounce")
+            return _record_disposition(record, InboundMessage.State.IGNORED, "auto-reply or bounce")
 
         if not inbound.from_identity:
-            return _settle(record, InboundMessage.State.UNMATCHED_REVIEW, "no sender identity")
+            return _record_disposition(
+                record, InboundMessage.State.UNMATCHED_REVIEW, "no sender identity"
+            )
 
         existing = _find_case(tenant, inbound, record)
         if existing is not None:
@@ -120,7 +122,7 @@ def _append_to(record: InboundMessage, dispute: Dispute, inbound: Inbound, tenan
                 "reason": "sender is not a verified contact for this case",
             },
         )
-        return _settle(
+        return _record_disposition(
             record,
             InboundMessage.State.QUARANTINED,
             "sender is not a verified contact for this case",
@@ -134,7 +136,7 @@ def _append_to(record: InboundMessage, dispute: Dispute, inbound: Inbound, tenan
         visibility=DisputeMessage.Visibility.CUSTOMER,
     )
     _ = message
-    return _settle(record, InboundMessage.State.MATCHED, "", dispute=dispute)
+    return _record_disposition(record, InboundMessage.State.MATCHED, "", dispute=dispute)
 
 
 def _file_new(record: InboundMessage, inbound: Inbound, tenant, default_category: str) -> Routed:
@@ -144,7 +146,7 @@ def _file_new(record: InboundMessage, inbound: Inbound, tenant, default_category
     if policy is None or policy.current_version is None:
         policy = SLAPolicy.objects.filter(category=default_category).first()
     if policy is None or policy.current_version is None:
-        return _settle(
+        return _record_disposition(
             record,
             InboundMessage.State.UNMATCHED_REVIEW,
             f"no SLA policy for {category!r} and no default",
@@ -184,10 +186,10 @@ def _file_new(record: InboundMessage, inbound: Inbound, tenant, default_category
         actor_type="system",
         payload={"inbound_id": record.pk, "channel": inbound.channel},
     )
-    return _settle(record, InboundMessage.State.FILED, "", dispute=dispute)
+    return _record_disposition(record, InboundMessage.State.FILED, "", dispute=dispute)
 
 
-def _settle(
+def _record_disposition(
     record: InboundMessage, state: str, reason: str, *, dispute: Dispute | None = None
 ) -> Routed:
     record.state = state
@@ -231,7 +233,7 @@ def attribute(*, record: InboundMessage, dispute: Dispute, actor_id: str, reason
             actor_id=actor_id,
             payload={"inbound_id": record.pk, "channel": record.channel, "reason": reason},
         )
-        return _settle(record, InboundMessage.State.MATCHED, reason, dispute=dispute)
+        return _record_disposition(record, InboundMessage.State.MATCHED, reason, dispute=dispute)
 
 
 CHANNELS_ACCEPTING_INBOUND = tuple(c for c in Channel.values if c != Channel.WIDGET)

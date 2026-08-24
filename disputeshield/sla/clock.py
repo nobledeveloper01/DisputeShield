@@ -210,7 +210,9 @@ def _materialise_deadlines(clock: SLAClock, *, at: datetime | None = None) -> No
         )
 
     for kind, threshold, fires_at in wanted:
-        existing = clock.deadlines.filter(kind=kind, threshold_percent=threshold).first()
+        existing = clock.deadlines.filter(
+            kind=kind, threshold_percent=threshold, pausable=True
+        ).first()
         if existing is None:
             SLADeadline.objects.create(
                 tenant=clock.tenant,
@@ -218,6 +220,7 @@ def _materialise_deadlines(clock: SLAClock, *, at: datetime | None = None) -> No
                 kind=kind,
                 threshold_percent=threshold,
                 fires_at=fires_at,
+                pausable=True,
             )
         elif existing.fired_at is None and existing.fires_at != fires_at:
             # A fired deadline is history and is never moved. Moving one would

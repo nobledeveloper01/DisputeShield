@@ -364,6 +364,12 @@ being wrong is expensive in a way code review does not catch.
 **Review:** `/cso` on connector credential handling. `/plan-eng-review` on the two-clock model before
 it is built.
 
+> **Status: complete.** The two-clock model is structural rather than
+> conventional: scheme deadlines are `pausable=False` rows on the same clock, so
+> one sweep fires both and a pause moves only ours. The money-movement gate walks
+> the AST rather than reading the code, and its first finding was a naming one —
+> a function called `_settle` in the intake router.
+
 ---
 
 ## Phase 10 — Intelligence, strictly advisory — **v1.4**

@@ -127,6 +127,22 @@ def erasure_request_id() -> str:
     return new_id("ers")
 
 
+def representment_id() -> str:
+    return new_id("rep")
+
+
+def connector_id() -> str:
+    return new_id("cnx")
+
+
+def provider_call_id() -> str:
+    return new_id("pcl")
+
+
+def settlement_id() -> str:
+    return new_id("stl")
+
+
 def message_id() -> str:
     return new_id("msg")
 
