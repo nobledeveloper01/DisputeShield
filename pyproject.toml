@@ -1,6 +1,6 @@
 [project]
 name = "disputeshield"
-version = "0.1.0"
+version = "2.1.0"
 description = "Embeddable dispute and SLA management for fintechs"
 readme = "README.md"
 requires-python = ">=3.12"

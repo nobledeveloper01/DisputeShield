@@ -7,7 +7,17 @@ All notable changes to this project are documented here. The format follows
 The PyPI package, the npm packages and the widget bundle are versioned together
 and released from one tag.
 
-## [Unreleased]
+## [2.1.0] — the dashboard, and the export that delivers itself — 2026-08-24
+
+The seven sections `dashboard/README.md` has described since phase 0 are now all
+built, and the regulatory export gained the two things §6.5 always implied it
+had: a document a supervisor reads, and a way for it to arrive without anybody
+remembering to send it.
+
+**Versions.** Every package in this repository declared `0.1.0` until this
+release, while the changelog described 1.0.0 and 2.0.0 — the numbers had never
+been bumped. All four now agree with each other and with this file, and
+`tests/test_version_agrees.py` fails the build if they drift again.
 
 ### Added
 

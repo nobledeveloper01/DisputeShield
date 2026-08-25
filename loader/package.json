@@ -1,6 +1,6 @@
 {
   "name": "@disputeshield/loader",
-  "version": "0.1.0",
+  "version": "2.1.0",
   "private": true,
   "description": "The ~4KB script that creates DisputeShield's sandboxed iframe",
   "license": "Apache-2.0",
