@@ -15,6 +15,7 @@ export function parse(hash) {
   if (path === '/analysis') return { name: 'analysis' };
   if (path === '/policies') return { name: 'policies' };
   if (path === '/widget') return { name: 'widget' };
+  if (path === '/settings') return { name: 'settings' };
   return { name: 'queue' };
 }
 

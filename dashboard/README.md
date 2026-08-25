@@ -16,10 +16,10 @@ Roles are Owner, Compliance, Agent and Read-only. An agent can resolve a case bu
 cannot change an SLA policy; a compliance user can change a policy, and the change
 is recorded, versioned and rendered next to the breach data it affects.
 
-**Built so far:** the queue (`src/queue/`), the case view (`src/case/`), SLA
-policies (`src/policies/`), the widget configuration (`src/widget/`), breach
-analysis (`src/analysis/`) and report delivery (`src/reports/`). Settings are
-still to come.
+**Built:** all seven sections — the queue (`src/queue/`), the case view
+(`src/case/`), SLA policies (`src/policies/`), the widget configuration
+(`src/widget/`), breach analysis (`src/analysis/`), report delivery
+(`src/reports/`) and settings (`src/settings/`).
 
 ## Running it
 
@@ -55,6 +55,29 @@ the other — and in the dangerous direction, because an agent triages from the
 queue. So the clock is time-until-deadline everywhere, and the case additionally
 shows business time under its own explicit label. Two figures with two labels is
 honest; one label over two quantities is not.
+
+## Settings
+
+Every action there is either irreversible or capable of locking somebody out, and
+none of them is urgent. So each control states its consequence *before* it is
+used rather than explaining itself in a refusal afterwards.
+
+Three things are worth knowing about the shape:
+
+- **A key is shown once.** Only an Argon2id hash is stored, so there is nothing
+  to show later. The panel says so, the value lives in component state and
+  nowhere else, and the browser suite asserts it never reaches the URL,
+  `localStorage` or `sessionStorage`.
+- **The last active owner cannot be demoted or deactivated, and nobody changes
+  their own role.** Both are enforced by the server; the dashboard mirrors them
+  as disabled controls with the reason rendered visibly and wired through
+  `aria-describedby`. A disabled control whose reason lives only in a `title` is
+  a considered refusal that reads as a broken interface.
+- **Retention is reported, not configured**, and there is **no SSO form**. Seven
+  years is a regulatory floor rather than a preference, and nothing in this
+  product implements SAML or OIDC — a settings screen offering a configuration
+  that goes nowhere costs an evaluation and then a support ticket before anybody
+  finds out.
 
 ## SLA policies
 

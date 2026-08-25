@@ -1332,6 +1332,136 @@ paths:
         '204':
           description: Withdrawn. The widget stops rendering there immediately.
         '404': *id002
+  /v1/api-keys:
+    get:
+      summary: API keys
+      operationId: listApiKeys
+      security:
+      - agentKey: []
+      description: 'Readable by any role that can read — a compliance officer should be able to see
+        what credentials exist. Only the prefix is returned: the remainder is Argon2id-hashed at
+        creation and is not recoverable. `is_current` marks the key the request authenticated with,
+        so a client can warn before somebody revokes the credential they are holding.'
+      responses:
+        '200':
+          description: Every key, active first.
+        '404': *id002
+    post:
+      summary: Issue a key
+      operationId: createApiKey
+      security:
+      - agentKey: []
+      description: '**Owner only.** The response carries `key` — the full value — and this is the
+        only time it exists outside the caller''s hands. Nothing stores it, so it cannot be shown
+        again; `shown_once` says so explicitly rather than leaving a client to discover it. The audit
+        record carries the prefix and never the value: an audit trail that records credentials is a
+        credential store with a seven-year retention policy attached.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, environment]
+              properties:
+                name:
+                  type: string
+                  description: What uses it. An unnamed key is one nobody can safely revoke.
+                environment:
+                  type: string
+                  enum: [test, live]
+                kind:
+                  type: string
+                  enum: [secret, publishable]
+                  default: secret
+      responses:
+        '201':
+          description: The key, including its value, once.
+        '400':
+          description: A missing name or an unknown environment.
+        '404': *id002
+  /v1/api-keys/{key_id}:
+    delete:
+      summary: Revoke a key
+      operationId: revokeApiKey
+      security:
+      - agentKey: []
+      description: 'Owner only, immediate, and permitted even on the key making the request — the
+        reason to revoke a key in a hurry is usually that it has leaked, and the person holding it is
+        the one who noticed. `revoked_the_current_key` says whether that just happened.'
+      parameters:
+      - name: key_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The revoked key.
+        '404': *id002
+  /v1/agents:
+    get:
+      summary: The team
+      operationId: listTeam
+      security:
+      - agentKey: []
+      description: Readable by any role that can read. `is_you` marks the acting agent and
+        `active_owners` is the count the lockout rules turn on.
+      responses:
+        '200':
+          description: Every member, active first, with the available roles.
+        '404': *id002
+    post:
+      summary: Add someone
+      operationId: addTeamMember
+      security:
+      - agentKey: []
+      description: Owner only.
+      responses:
+        '201':
+          description: The new member.
+        '400':
+          description: An address that does not parse, an unknown role, or one already on the team.
+        '404': *id002
+  /v1/agents/{agent_id}:
+    patch:
+      summary: Change a role, or deactivate
+      operationId: updateTeamMember
+      security:
+      - agentKey: []
+      description: 'Owner only, with two refusals that exist because neither has a recovery path.
+        **The last active owner cannot be demoted or deactivated**: a tenant with no owner cannot
+        mint a key, change a role or register an origin, and there is no way back from that state.
+        **Nobody changes their own role** — self-promotion is the obvious reason, self-demotion the
+        likelier accident, and both end in the same locked-out tenant.'
+      parameters:
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The member as they now stand.
+        '400':
+          description: A change that would strand the tenant, or a change to your own role.
+        '404': *id002
+  /v1/retention:
+    get:
+      summary: The retention position
+      operationId: getRetention
+      security:
+      - agentKey: []
+      description: '**Read-only, and deliberately so.** §11.7 sets seven years; a tenant able to
+        shorten its own window below the mandated period would be using a settings endpoint to fall
+        out of compliance. What is offered instead is the position: what is past the window, how many
+        legal holds are active against it, and the fact that the sweep reports rather than deletes
+        unless told otherwise — because "nothing has been deleted" and "the sweep has not run" look
+        identical from a case count.'
+      responses:
+        '200':
+          description: Window, cutoff, cases past it, active holds and sealing status.
+        '404': *id002
   /v1/audit/verify:
     get:
       summary: Verify the audit chain

@@ -11,6 +11,39 @@ and released from one tag.
 
 ### Added
 
+- **Settings: the management API and the view** — `GET/POST /v1/api-keys`,
+  `DELETE /v1/api-keys/{id}`, `GET/POST /v1/agents`, `PATCH /v1/agents/{id}`,
+  `GET /v1/retention`, and `dashboard/src/settings/`. This completes the seven
+  sections the dashboard README has described since phase 0.
+- **A key value is returned exactly once.** Only an Argon2id hash is stored, so
+  there is nothing to retrieve later, and `shown_once` says so rather than
+  leaving a client to find out. The audit record carries the prefix and never the
+  value — an audit trail that records credentials is a credential store with a
+  seven-year retention policy attached. The browser suite asserts the minted key
+  never reaches the URL, `localStorage` or `sessionStorage`.
+- Revoking is permitted **on the key making the request**. Refusing that would be
+  the wrong protection: the reason to revoke in a hurry is usually a leak, and the
+  person holding the key is the one who noticed. The response says what happened
+  and the dashboard warns first.
+- **The last active owner cannot be demoted or deactivated**, and **nobody
+  changes their own role.** Neither has a recovery path: a tenant with no owner
+  cannot mint a key, change a role or register an origin. Self-promotion is the
+  obvious reason for the second rule; self-demotion is the likelier accident and
+  ends in the same locked-out tenant.
+- Through the API the two guards overlap completely — demoting the *last* owner
+  is always demoting yourself, so the self-role rule fires first and the
+  last-owner branch is unreachable. It is kept as defence in depth for callers
+  that are not the API, and tested where it lives rather than through a route
+  that cannot reach it.
+- **Retention is reported, not configured.** Seven years is a regulatory floor,
+  and a tenant able to shorten its own window would be using a settings screen to
+  fall out of compliance. The endpoint offers the position instead: what is past
+  the window, how many legal holds stand against it, and that the sweep reports
+  rather than deletes unless told — because "nothing has been deleted" and "the
+  sweep has not run" look identical from a case count.
+- **No SSO form.** Nothing in this product implements SAML or OIDC, and a
+  settings screen offering a configuration that goes nowhere costs an evaluation
+  and then a support ticket before anybody finds out. The screen says so.
 - **Widget configuration: the management API and the view** —
   `GET/PATCH /v1/widget-config`, `POST/DELETE /v1/widget-config/origins`, and
   `dashboard/src/widget/`. §7.3 listed the surface; nothing implemented it.
@@ -300,6 +333,12 @@ and released from one tag.
 
 ### Fixed
 
+- A disabled control on the team table explained itself only through a `title`,
+  which a keyboard user cannot reach and a screen reader may never announce —
+  turning a considered refusal into an interface that appears broken. The reason
+  is now rendered visibly and wired through `aria-describedby`. axe did not catch
+  it, because "disabled control with no reachable explanation" is not a rule it
+  has.
 - **The widget preview was not live.** The draft theme lived inside the theming
   form while the preview rendered from the saved configuration, so a colour only
   appeared in the preview after it had been published — which would mean pushing

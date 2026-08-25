@@ -24,6 +24,13 @@ from disputeshield.api.views_reports import (
     ReportScheduleView,
     SLAPerformanceView,
 )
+from disputeshield.api.views_settings import (
+    APIKeyDetailView,
+    APIKeyView,
+    RetentionView,
+    TeamMemberView,
+    TeamView,
+)
 from disputeshield.api.views_widget import (
     SessionView,
     WidgetConfigView,
@@ -91,6 +98,11 @@ urlpatterns = [
         WidgetOriginDetailView.as_view(),
         name="widget-origin-detail",
     ),
+    path("v1/api-keys", APIKeyView.as_view(), name="api-keys"),
+    path("v1/api-keys/<str:key_id>", APIKeyDetailView.as_view(), name="api-key-detail"),
+    path("v1/agents", TeamView.as_view(), name="team"),
+    path("v1/agents/<str:agent_id>", TeamMemberView.as_view(), name="team-member"),
+    path("v1/retention", RetentionView.as_view(), name="retention"),
     path("v1/audit/verify", AuditVerifyView.as_view(), name="audit-verify"),
     path("v1/", include(router.urls)),
 ]

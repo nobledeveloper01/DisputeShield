@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Analysis from './analysis/Analysis.jsx';
 import Case from './case/Case.jsx';
 import Policies from './policies/Policies.jsx';
+import Settings from './settings/Settings.jsx';
 import WidgetConfig from './widget/WidgetConfig.jsx';
 import Queue from './queue/Queue.jsx';
 import Recipients from './reports/Recipients.jsx';
@@ -49,6 +50,13 @@ export default function App({ client }) {
         </a>
         <a
           className="ds-link"
+          href="#/settings"
+          aria-current={route.name === 'settings' ? 'page' : undefined}
+        >
+          Settings
+        </a>
+        <a
+          className="ds-link"
           href="#/reports"
           aria-current={route.name === 'reports' ? 'page' : undefined}
         >
@@ -61,6 +69,7 @@ export default function App({ client }) {
       {route.name === 'policies' ? <PoliciesScreen client={client} /> : null}
       {route.name === 'analysis' ? <AnalysisScreen client={client} /> : null}
       {route.name === 'widget' ? <WidgetScreen client={client} /> : null}
+      {route.name === 'settings' ? <SettingsScreen client={client} /> : null}
       {route.name === 'reports' ? <ReportsScreen client={client} /> : null}
     </>
   );
@@ -181,6 +190,65 @@ function Failed({ message }) {
  * partially-rendered list of schedules invites a decision made on half the
  * picture.
  */
+function SettingsScreen({ client }) {
+  const [state, setState] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const [keys, team, retention] = await Promise.all([
+        client.apiKeys(),
+        client.team(),
+        client.retention()
+      ]);
+      setState({ keys, team, retention });
+      setError('');
+    } catch (problem) {
+      setError(problem.message);
+    }
+  }, [client]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const guard = useCallback(
+    async (action) => {
+      setBusy(true);
+      try {
+        return await action();
+      } finally {
+        setBusy(false);
+        await load();
+      }
+    },
+    [load]
+  );
+
+  if (error) return <Failed message={error} />;
+  if (state === null) return <Loading />;
+
+  return (
+    <main className="ds-app ds-app-wide">
+      <Settings
+        keys={state.keys}
+        team={state.team}
+        retention={state.retention}
+        busy={busy}
+        // The minted key is returned to the caller and never stored here. It
+        // lives in the Keys component's state for as long as it is on screen.
+        onCreateKey={(payload) => guard(() => client.createKey(payload))}
+        onRevokeKey={(key) => guard(() => client.revokeKey(key.id))}
+        onAddMember={(payload) => guard(() => client.addMember(payload))}
+        onChangeMember={(member, changes) =>
+          guard(() => client.changeMember(member.id, changes))
+        }
+      />
+    </main>
+  );
+}
+
 function WidgetScreen({ client }) {
   const [config, setConfig] = useState(null);
   const [busy, setBusy] = useState(false);

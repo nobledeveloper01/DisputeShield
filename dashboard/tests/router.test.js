@@ -24,6 +24,7 @@ test('the compliance routes resolve', () => {
   assert.deepEqual(parse('#/analysis'), { name: 'analysis' });
   assert.deepEqual(parse('#/policies'), { name: 'policies' });
   assert.deepEqual(parse('#/widget'), { name: 'widget' });
+  assert.deepEqual(parse('#/settings'), { name: 'settings' });
 });
 
 test('an unknown route falls back to the queue rather than blank', () => {

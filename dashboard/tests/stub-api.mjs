@@ -347,6 +347,155 @@ export const WIDGET_SOUND = {
   categories: [{ name: 'failed_transfer', has_policy: true }]
 };
 
+/**
+ * Settings fixtures.
+ *
+ * Every key here is a `test`-environment key. A `live`-shaped value committed to
+ * this repository is caught by the gitleaks rule added in phase 4 — and should
+ * be, which is why these do not go near one. The `live` rows below carry only a
+ * prefix and a hash never existed for them.
+ */
+export const KEYS = {
+  can_manage: true,
+  data: [
+    {
+      id: 'key_live',
+      name: 'Production backend',
+      environment: 'live',
+      kind: 'secret',
+      prefix: 'ds_live_9f2c',
+      created_at: '2026-01-04T09:00:00+00:00',
+      last_used_at: '2026-08-24T08:12:00+00:00',
+      revoked_at: null,
+      is_active: true,
+      is_current: false
+    },
+    {
+      id: 'key_ci',
+      name: 'CI',
+      environment: 'test',
+      kind: 'secret',
+      prefix: 'ds_test_41aa',
+      created_at: '2026-02-11T09:00:00+00:00',
+      last_used_at: null,
+      revoked_at: null,
+      is_active: true,
+      is_current: true
+    },
+    {
+      id: 'key_old',
+      name: 'Retired laptop',
+      environment: 'test',
+      kind: 'secret',
+      prefix: 'ds_test_00bb',
+      created_at: '2025-11-01T09:00:00+00:00',
+      last_used_at: '2025-12-20T09:00:00+00:00',
+      revoked_at: '2026-01-02T09:00:00+00:00',
+      is_active: false,
+      is_current: false
+    }
+  ]
+};
+
+const ROLES = [
+  { value: 'owner', label: 'Owner' },
+  { value: 'compliance', label: 'Compliance' },
+  { value: 'agent', label: 'Agent' },
+  { value: 'read_only', label: 'Read-only' }
+];
+
+export const TEAM = {
+  can_manage: true,
+  active_owners: 1,
+  roles: ROLES,
+  data: [
+    {
+      id: 'agt_owner',
+      email: 'adaeze@example.test',
+      display_name: 'Adaeze',
+      role: 'owner',
+      is_active: true,
+      created_at: '2026-01-04T09:00:00+00:00',
+      is_you: true
+    },
+    {
+      id: 'agt_ngozi',
+      email: 'ngozi@example.test',
+      display_name: 'Ngozi',
+      role: 'agent',
+      is_active: true,
+      created_at: '2026-01-04T09:00:00+00:00',
+      is_you: false
+    },
+    {
+      id: 'agt_former',
+      email: 'former@example.test',
+      display_name: 'Former colleague',
+      role: 'agent',
+      is_active: false,
+      created_at: '2025-06-01T09:00:00+00:00',
+      is_you: false
+    }
+  ]
+};
+
+export const TEAM_TWO_OWNERS = {
+  ...TEAM,
+  active_owners: 2,
+  data: [
+    ...TEAM.data,
+    {
+      id: 'agt_second',
+      email: 'second@example.test',
+      display_name: 'Second owner',
+      role: 'owner',
+      is_active: true,
+      created_at: '2026-03-01T09:00:00+00:00',
+      is_you: false
+    }
+  ]
+};
+
+export const RETENTION = {
+  years: 7,
+  cutoff: '2019-08-24T00:00:00+00:00',
+  cases_past_window: 12,
+  active_legal_holds: 2,
+  sealing_enabled: false,
+  deletes_only_when_told: true
+};
+
+export const MINTED = {
+  id: 'key_new',
+  name: 'New integration',
+  environment: 'test',
+  kind: 'secret',
+  prefix: 'ds_test_7b1d',
+  created_at: '2026-08-24T10:00:00+00:00',
+  last_used_at: null,
+  revoked_at: null,
+  is_active: true,
+  is_current: false,
+  key: 'ds_test_7b1dEXAMPLEVALUEFORTESTSONLY00',
+  shown_once: true
+};
+
+export async function stubSettings(page, { keys = KEYS, team = TEAM } = {}) {
+  await page.route('**/v1/api-keys', (route) =>
+    route.request().method() === 'GET'
+      ? route.fulfill({ json: keys })
+      : route.fulfill({ status: 201, json: MINTED })
+  );
+  await page.route('**/v1/api-keys/*', (route) => route.fulfill({ json: keys.data[0] }));
+  await page.route('**/v1/agents', (route) =>
+    route.request().method() === 'GET'
+      ? route.fulfill({ json: team })
+      : route.fulfill({ status: 201, json: team.data[1] })
+  );
+  await page.route('**/v1/agents/*', (route) => route.fulfill({ json: team.data[1] }));
+  await page.route('**/v1/retention', (route) => route.fulfill({ json: RETENTION }));
+}
+
 export async function stubWidget(page, payload = WIDGET) {
   await page.route('**/v1/widget-config', (route) =>
     route.request().method() === 'GET'

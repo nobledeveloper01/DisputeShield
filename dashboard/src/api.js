@@ -45,6 +45,15 @@ export function createClient({ baseUrl }) {
     resume: (id, reason) =>
       request(`/v1/disputes/${id}/resume/`, { method: 'POST', body: { reason } }),
 
+    apiKeys: () => request('/v1/api-keys'),
+    createKey: (payload) => request('/v1/api-keys', { method: 'POST', body: payload }),
+    revokeKey: (id) => request(`/v1/api-keys/${id}`, { method: 'DELETE' }),
+    team: () => request('/v1/agents'),
+    addMember: (payload) => request('/v1/agents', { method: 'POST', body: payload }),
+    changeMember: (id, payload) =>
+      request(`/v1/agents/${id}`, { method: 'PATCH', body: payload }),
+    retention: () => request('/v1/retention'),
+
     widgetConfig: () => request('/v1/widget-config'),
     saveWidgetConfig: (payload) =>
       request('/v1/widget-config', { method: 'PATCH', body: payload }),

@@ -505,3 +505,29 @@ span.ds-help { display: block; }
   .ds-widget-layout { grid-template-columns: minmax(0, 1fr); }
   .ds-preview { position: static; }
 }
+
+/* --- settings ------------------------------------------------------------- */
+
+.ds-settings-block { margin-bottom: calc(var(--ds-space) * 6); max-width: 900px; }
+
+/* The one moment a credential exists on screen. Heavy rule, generous space and
+   a monospaced block, so it reads as something to act on rather than as another
+   row. Ink, not colour — nothing here is a deadline. */
+.ds-minted {
+  border-left-width: 4px;
+  border-left-color: var(--ds-ink);
+  background: var(--ds-raised);
+  margin-bottom: calc(var(--ds-space) * 2);
+  display: grid;
+  gap: var(--ds-space);
+  justify-items: start;
+}
+.ds-secret {
+  display: block;
+  width: 100%;
+  padding: var(--ds-space);
+  background: var(--ds-bg);
+  border: 1px solid var(--ds-line);
+  word-break: break-all;
+  user-select: all;
+}
