@@ -375,15 +375,25 @@ span.ds-help { display: block; }
 
 /* --- breach analysis ------------------------------------------------------ */
 
+/* Flex-wrap rather than an auto-fit grid. The dividing lines are the container
+   showing through a 1px gap, and a grid leaves the last row's unused tracks
+   uncovered — so a five-cell summary in a four-column layout painted a grey
+   block where a fifth column would have been, which reads as something failing
+   to load. Wrapped flex items grow to fill their row, so there is no uncovered
+   track to show through. */
 .ds-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 1px;
   margin: calc(var(--ds-space) * 2) 0 calc(var(--ds-space) * 4);
   background: var(--ds-line);
   border: 1px solid var(--ds-line);
 }
-.ds-summary-cell { background: var(--ds-bg); padding: calc(var(--ds-space) * 1.5); }
+.ds-summary-cell {
+  flex: 1 1 190px;
+  background: var(--ds-bg);
+  padding: calc(var(--ds-space) * 1.5);
+}
 .ds-summary dt { color: var(--ds-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
 .ds-summary dd { margin: 4px 0 0; }
 .ds-figure { font-size: 24px; line-height: 1.1; }

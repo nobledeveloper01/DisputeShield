@@ -151,6 +151,20 @@ test('SSO is declared unavailable rather than offered as a dead form', async ({ 
   await expect(block.locator('input, select')).toHaveCount(0);
 });
 
+test('the summary grid leaves no uncovered strip on its last row', async ({ page }) => {
+  // The dividing lines are the container showing through a 1px gap. Any row that
+  // does not fill leaves that colour exposed, which reads as a panel failing to
+  // load rather than as a layout with five cells in it.
+  const edges = await page.locator('.ds-summary').evaluate((grid) => {
+    const cells = [...grid.querySelectorAll('.ds-summary-cell')];
+    const box = grid.getBoundingClientRect();
+    const last = cells[cells.length - 1].getBoundingClientRect();
+    return { gridRight: Math.round(box.right), lastRight: Math.round(last.right) };
+  });
+  // Within the container's 1px border.
+  expect(Math.abs(edges.gridRight - edges.lastRight)).toBeLessThanOrEqual(2);
+});
+
 test('nothing on the settings screen carries colour', async ({ page }) => {
   // Colour is reserved for time, and nothing here is a deadline — including the
   // panel that shows a credential once.

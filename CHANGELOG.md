@@ -333,6 +333,12 @@ and released from one tag.
 
 ### Fixed
 
+- The summary grid painted a **grey block where its last row did not fill**. The
+  dividing lines are the container showing through a 1px gap, and an auto-fit
+  grid leaves unused tracks uncovered — so five cells in a four-column layout
+  exposed the line colour where a fifth column would have been, which reads as a
+  panel failing to load. Wrapped flex items grow to fill their row instead. It
+  affected the breach analysis summary too.
 - A disabled control on the team table explained itself only through a `title`,
   which a keyboard user cannot reach and a screen reader may never announce —
   turning a considered refusal into an interface that appears broken. The reason
